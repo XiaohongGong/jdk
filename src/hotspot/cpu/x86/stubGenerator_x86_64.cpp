@@ -3648,6 +3648,111 @@ address StubGenerator::generate_throw_exception(const char* name,
   return stub->entry_point();
 }
 
+// Arguments:
+//
+// Input:
+//   c_rarg0   - the output array address
+//   c_rarg1   - the first input array address
+//   c_rarg2   - the second input array address
+//   c_rarg3   - the native method entry of the vector math implementation
+//   c_rarg4   - the vector element count
+//   c_rarg5   - the element type flag, "true" if the type is float
+//
+address StubGenerator::generate_vector_math_wrapper(int size) {
+  __ align(CodeEntryAlignment);
+  StubCodeMark mark(this, "StubRoutines", "vectorMathWrapper");
+  address start = __ pc();
+
+  const Register dst      = c_rarg0;
+  const Register src1     = c_rarg1;
+  const Register src2     = c_rarg2;
+  const Register entry    = c_rarg3;
+
+  BLOCK_COMMENT("Entry:");
+  __ enter();
+
+  // Save live registers before call
+  __ push(dst);
+
+  switch (size) {
+    case VectorSupport::VEC_SIZE_64: {
+      Label CALL_64;
+      // Load input vectors
+      __ movq(xmm0, Address(src1, 0));
+      __ testq(src2, src2);
+      __ jcc(Assembler::zero, CALL_64);
+      __ movq(xmm1, Address(src2, 0));
+      // Call method of the native vector implementation
+      __ bind(CALL_64);
+      __ call(entry);
+      // Restore registers
+      __ pop(dst);
+      // Store vector result to dst address
+      __ movq(Address(dst, 0), xmm0);
+      break;
+    }
+    case VectorSupport::VEC_SIZE_128: {
+      Label CALL_128;
+      // Load input vectors
+      __ movdqu(xmm0, Address(src1, 0));
+      __ testq(src2, src2);
+      __ jcc(Assembler::zero, CALL_128);
+      __ movdqu(xmm1, Address(src2, 0));
+      // Call method of the native vector implementation
+      __ bind(CALL_128);
+      __ call(entry);
+      // Restore registers
+      __ pop(dst);
+      // Store vector result to dst address
+      __ movdqu(Address(dst, 0), xmm0);
+      break;
+    }
+    case VectorSupport::VEC_SIZE_256: {
+      if (UseAVX > 0) {
+        Label CALL_256;
+        // Load input vectors
+        __ vmovdqu(xmm0, Address(src1, 0));
+        __ testq(src2, src2);
+        __ jcc(Assembler::zero, CALL_256);
+        __ vmovdqu(xmm1, Address(src2, 0));
+        // Call method of the native vector implementation
+        __ bind(CALL_256);
+        __ call(entry);
+        // Restore registers
+        __ pop(dst);
+        // Store vector result to dst address
+        __ vmovdqu(Address(dst, 0), xmm0);
+        break;
+      }
+    }
+    case VectorSupport::VEC_SIZE_512: {
+      if (VM_Version::supports_evex()) {
+        Label CALL_512;
+        // Load input vectors
+        __ evmovdqul(xmm0, Address(src1, 0), Assembler::AVX_512bit);
+        __ testq(src2, src2);
+        __ jcc(Assembler::zero, CALL_512);
+        __ evmovdqul(xmm1, Address(src2, 0), Assembler::AVX_512bit);
+        // Call method of the native vector implementation
+        __ bind(CALL_512);
+        __ call(entry);
+        // Restore registers
+        __ pop(dst);
+        // Store vector result to dst address
+        __ evmovdqul(Address(dst, 0), xmm0, Assembler::AVX_512bit);
+        break;
+      }
+    }
+    default:
+      Unimplemented();
+      break;
+  }
+
+  __ leave();
+  __ ret(0);
+  return start;
+}
+
 void StubGenerator::create_control_words() {
   // Round to nearest, 64-bit mode, exceptions masked
   StubRoutines::x86::_mxcsr_std = 0x1F80;
@@ -3918,42 +4023,48 @@ void StubGenerator::generate_all() {
 
     log_info(library)("Loaded library %s, handle " INTPTR_FORMAT, JNI_LIB_PREFIX "jsvml" JNI_LIB_SUFFIX, p2i(libjsvml));
     if (UseAVX > 2) {
-      for (int op = 0; op < VectorSupport::NUM_SVML_OP; op++) {
-        int vop = VectorSupport::VECTOR_OP_SVML_START + op;
+      for (int op = 0; op < VectorSupport::NUM_VECTOR_MATH_OP; op++) {
+        int vop = VectorSupport::VECTOR_OP_MATH_START + op;
         if ((!VM_Version::supports_avx512dq()) &&
             (vop == VectorSupport::VECTOR_OP_LOG || vop == VectorSupport::VECTOR_OP_LOG10 || vop == VectorSupport::VECTOR_OP_POW)) {
           continue;
         }
-        snprintf(ebuf, sizeof(ebuf), "__jsvml_%sf16_ha_z0", VectorSupport::svmlname[op]);
+        snprintf(ebuf, sizeof(ebuf), "__jsvml_%sf16_ha_z0", VectorSupport::mathname[op]);
         StubRoutines::_vector_f_math[VectorSupport::VEC_SIZE_512][op] = (address)os::dll_lookup(libjsvml, ebuf);
 
-        snprintf(ebuf, sizeof(ebuf), "__jsvml_%s8_ha_z0", VectorSupport::svmlname[op]);
+        snprintf(ebuf, sizeof(ebuf), "__jsvml_%s8_ha_z0", VectorSupport::mathname[op]);
         StubRoutines::_vector_d_math[VectorSupport::VEC_SIZE_512][op] = (address)os::dll_lookup(libjsvml, ebuf);
       }
+      StubRoutines::_vector_math_wrapper[VectorSupport::VEC_SIZE_512] = generate_vector_math_wrapper(VectorSupport::VEC_SIZE_512);
     }
     const char* avx_sse_str = (UseAVX >= 2) ? "l9" : ((UseAVX == 1) ? "e9" : "ex");
-    for (int op = 0; op < VectorSupport::NUM_SVML_OP; op++) {
-      int vop = VectorSupport::VECTOR_OP_SVML_START + op;
+    for (int op = 0; op < VectorSupport::NUM_VECTOR_MATH_OP; op++) {
+      int vop = VectorSupport::VECTOR_OP_MATH_START + op;
       if (vop == VectorSupport::VECTOR_OP_POW) {
         continue;
       }
-      snprintf(ebuf, sizeof(ebuf), "__jsvml_%sf4_ha_%s", VectorSupport::svmlname[op], avx_sse_str);
+      snprintf(ebuf, sizeof(ebuf), "__jsvml_%sf4_ha_%s", VectorSupport::mathname[op], avx_sse_str);
       StubRoutines::_vector_f_math[VectorSupport::VEC_SIZE_64][op] = (address)os::dll_lookup(libjsvml, ebuf);
 
-      snprintf(ebuf, sizeof(ebuf), "__jsvml_%sf4_ha_%s", VectorSupport::svmlname[op], avx_sse_str);
+      snprintf(ebuf, sizeof(ebuf), "__jsvml_%sf4_ha_%s", VectorSupport::mathname[op], avx_sse_str);
       StubRoutines::_vector_f_math[VectorSupport::VEC_SIZE_128][op] = (address)os::dll_lookup(libjsvml, ebuf);
 
-      snprintf(ebuf, sizeof(ebuf), "__jsvml_%sf8_ha_%s", VectorSupport::svmlname[op], avx_sse_str);
+      snprintf(ebuf, sizeof(ebuf), "__jsvml_%sf8_ha_%s", VectorSupport::mathname[op], avx_sse_str);
       StubRoutines::_vector_f_math[VectorSupport::VEC_SIZE_256][op] = (address)os::dll_lookup(libjsvml, ebuf);
 
-      snprintf(ebuf, sizeof(ebuf), "__jsvml_%s1_ha_%s", VectorSupport::svmlname[op], avx_sse_str);
+      snprintf(ebuf, sizeof(ebuf), "__jsvml_%s1_ha_%s", VectorSupport::mathname[op], avx_sse_str);
       StubRoutines::_vector_d_math[VectorSupport::VEC_SIZE_64][op] = (address)os::dll_lookup(libjsvml, ebuf);
 
-      snprintf(ebuf, sizeof(ebuf), "__jsvml_%s2_ha_%s", VectorSupport::svmlname[op], avx_sse_str);
+      snprintf(ebuf, sizeof(ebuf), "__jsvml_%s2_ha_%s", VectorSupport::mathname[op], avx_sse_str);
       StubRoutines::_vector_d_math[VectorSupport::VEC_SIZE_128][op] = (address)os::dll_lookup(libjsvml, ebuf);
 
-      snprintf(ebuf, sizeof(ebuf), "__jsvml_%s4_ha_%s", VectorSupport::svmlname[op], avx_sse_str);
+      snprintf(ebuf, sizeof(ebuf), "__jsvml_%s4_ha_%s", VectorSupport::mathname[op], avx_sse_str);
       StubRoutines::_vector_d_math[VectorSupport::VEC_SIZE_256][op] = (address)os::dll_lookup(libjsvml, ebuf);
+    }
+    StubRoutines::_vector_math_wrapper[VectorSupport::VEC_SIZE_64] = generate_vector_math_wrapper(VectorSupport::VEC_SIZE_64);
+    StubRoutines::_vector_math_wrapper[VectorSupport::VEC_SIZE_128] = generate_vector_math_wrapper(VectorSupport::VEC_SIZE_128);
+    if (UseAVX > 0) {
+      StubRoutines::_vector_math_wrapper[VectorSupport::VEC_SIZE_256] = generate_vector_math_wrapper(VectorSupport::VEC_SIZE_256);
     }
   }
 #endif // COMPILER2

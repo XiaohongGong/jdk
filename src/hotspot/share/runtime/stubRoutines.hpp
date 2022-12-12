@@ -257,8 +257,9 @@ class StubRoutines: AllStatic {
   JFR_ONLY(static address _jfr_write_checkpoint;)
 
   // Vector Math Routines
-  static address _vector_f_math[VectorSupport::NUM_VEC_SIZES][VectorSupport::NUM_SVML_OP];
-  static address _vector_d_math[VectorSupport::NUM_VEC_SIZES][VectorSupport::NUM_SVML_OP];
+  static address _vector_f_math[VectorSupport::NUM_VEC_SIZES][VectorSupport::NUM_VECTOR_MATH_OP];
+  static address _vector_d_math[VectorSupport::NUM_VEC_SIZES][VectorSupport::NUM_VECTOR_MATH_OP];
+  static address _vector_math_wrapper[VectorSupport::NUM_VEC_SIZES];
 
  public:
   // Initialization/Testing

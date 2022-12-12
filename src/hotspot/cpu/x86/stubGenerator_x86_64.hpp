@@ -479,6 +479,9 @@ class StubGenerator: public StubCodeGenerator {
   address generate_libmLog();
   address generate_libmLog10();
 
+  // Vector math wrapper stubs
+  address generate_vector_math_wrapper(int size);
+
   // Shared constants
   static address ZERO;
   static address NEG_ZERO;

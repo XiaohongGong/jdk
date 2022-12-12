@@ -198,6 +198,13 @@ final class Double64Vector extends DoubleVector {
             super.uOpTemplate((Double64Mask)m, f);  // specialize
     }
 
+    @ForceInline
+    final @Override
+    Double64Vector mathUnOp(int opd, VectorMask<Double> m, FUnOp f) {
+        return (Double64Vector)
+            super.mathUnOpTemplate(opd, (Double64Mask)m, f);  // specialize
+    }
+
     // Binary operator
 
     @ForceInline
@@ -213,6 +220,13 @@ final class Double64Vector extends DoubleVector {
         return (Double64Vector)
             super.bOpTemplate((Double64Vector)v, (Double64Mask)m,
                               f);  // specialize
+    }
+
+    @ForceInline
+    final @Override
+    Double64Vector mathBinOp(int opd, Vector<Double> v, VectorMask<Double> m, FBinOp f) {
+        return (Double64Vector)
+            super.mathBinOpTemplate(opd, (Double64Vector)v, (Double64Mask)m, f);  // specialize
     }
 
     // Ternary operator

@@ -887,7 +887,17 @@ static int c_calling_convention_priv(const BasicType *sig_bt,
 int SharedRuntime::vector_calling_convention(VMRegPair *regs,
                                              uint num_bits,
                                              uint total_args_passed) {
-  Unimplemented();
+  static const FloatRegister VEC_ArgReg[Argument::n_float_register_parameters_c] = {
+    v0, v1, v2, v3, v4, v5, v6, v7
+  };
+
+  uint fp_args = 0;
+  for (uint i = 0; i < total_args_passed; i++) {
+    VMReg vmreg = VEC_ArgReg[fp_args++]->as_VMReg();
+    int next_val = num_bits == 64 ? 1 : 3;
+    regs[i].set_pair(vmreg->next(next_val), vmreg);
+  }
+
   return 0;
 }
 
