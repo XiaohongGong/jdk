@@ -697,6 +697,10 @@ public class VectorSupport {
     // query the JVM's supported vector sizes and types
     public static native int getMaxLaneCount(Class<?> etype);
 
+    public static native boolean hasNativeImpl(int opr, Class<?> etype, int length);
+
+    public static native Object nativeImpl(int opr, Class<?> etype, int length, Object vec1, Object vec2);
+
     /* ============================================================================ */
 
     public static boolean isNonCapturingLambda(Object o) {

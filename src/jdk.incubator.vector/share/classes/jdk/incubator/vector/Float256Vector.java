@@ -198,6 +198,13 @@ final class Float256Vector extends FloatVector {
             super.uOpTemplate((Float256Mask)m, f);  // specialize
     }
 
+    @ForceInline
+    final @Override
+    Float256Vector mathUnOp(int opd, VectorMask<Float> m, FUnOp f) {
+        return (Float256Vector)
+            super.mathUnOpTemplate(opd, (Float256Mask)m, f);  // specialize
+    }
+
     // Binary operator
 
     @ForceInline
@@ -213,6 +220,13 @@ final class Float256Vector extends FloatVector {
         return (Float256Vector)
             super.bOpTemplate((Float256Vector)v, (Float256Mask)m,
                               f);  // specialize
+    }
+
+    @ForceInline
+    final @Override
+    Float256Vector mathBinOp(int opd, Vector<Float> v, VectorMask<Float> m, FBinOp f) {
+        return (Float256Vector)
+            super.mathBinOpTemplate(opd, (Float256Vector)v, (Float256Mask)m, f);  // specialize
     }
 
     // Ternary operator

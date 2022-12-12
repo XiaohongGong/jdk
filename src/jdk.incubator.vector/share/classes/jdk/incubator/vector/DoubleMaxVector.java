@@ -198,6 +198,13 @@ final class DoubleMaxVector extends DoubleVector {
             super.uOpTemplate((DoubleMaxMask)m, f);  // specialize
     }
 
+    @ForceInline
+    final @Override
+    DoubleMaxVector mathUnOp(int opd, VectorMask<Double> m, FUnOp f) {
+        return (DoubleMaxVector)
+            super.mathUnOpTemplate(opd, (DoubleMaxMask)m, f);  // specialize
+    }
+
     // Binary operator
 
     @ForceInline
@@ -213,6 +220,13 @@ final class DoubleMaxVector extends DoubleVector {
         return (DoubleMaxVector)
             super.bOpTemplate((DoubleMaxVector)v, (DoubleMaxMask)m,
                               f);  // specialize
+    }
+
+    @ForceInline
+    final @Override
+    DoubleMaxVector mathBinOp(int opd, Vector<Double> v, VectorMask<Double> m, FBinOp f) {
+        return (DoubleMaxVector)
+            super.mathBinOpTemplate(opd, (DoubleMaxVector)v, (DoubleMaxMask)m, f);  // specialize
     }
 
     // Ternary operator

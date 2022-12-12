@@ -198,6 +198,13 @@ final class Float512Vector extends FloatVector {
             super.uOpTemplate((Float512Mask)m, f);  // specialize
     }
 
+    @ForceInline
+    final @Override
+    Float512Vector mathUnOp(int opd, VectorMask<Float> m, FUnOp f) {
+        return (Float512Vector)
+            super.mathUnOpTemplate(opd, (Float512Mask)m, f);  // specialize
+    }
+
     // Binary operator
 
     @ForceInline
@@ -213,6 +220,13 @@ final class Float512Vector extends FloatVector {
         return (Float512Vector)
             super.bOpTemplate((Float512Vector)v, (Float512Mask)m,
                               f);  // specialize
+    }
+
+    @ForceInline
+    final @Override
+    Float512Vector mathBinOp(int opd, Vector<Float> v, VectorMask<Float> m, FBinOp f) {
+        return (Float512Vector)
+            super.mathBinOpTemplate(opd, (Float512Vector)v, (Float512Mask)m, f);  // specialize
     }
 
     // Ternary operator

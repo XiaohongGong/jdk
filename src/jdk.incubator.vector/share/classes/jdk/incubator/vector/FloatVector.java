@@ -186,6 +186,33 @@ public abstract class FloatVector extends AbstractVector<Float> {
         return vectorFactory(res);
     }
 
+    /*package-private*/
+    abstract
+    FloatVector mathUnOp(int opd,
+                          VectorMask<Float> m,
+                          FUnOp f);
+    @ForceInline
+    final
+    FloatVector mathUnOpTemplate(int opd,
+                                  VectorMask<Float> m,
+                                  FUnOp f) {
+        if (VectorSupport.hasNativeImpl(opd, float.class, length())) {
+            float[] vec = vec();
+            Object obj = VectorSupport.nativeImpl(opd, float.class, length(), vec, null);
+            if (obj != null) {
+                float[] res = (float[]) obj;
+                if (m != null) {
+                    boolean[] mbits = ((AbstractMask<Float>)m).getBits();
+                    for (int i = 0; i < res.length; i++) {
+                        res[i] = mbits[i] ? res[i] : vec[i];
+                    }
+                }
+                return vectorFactory(res);
+            }
+        }
+        return uOpTemplate(m, f);
+    }
+
     // Binary operator
 
     /*package-private*/
@@ -231,6 +258,36 @@ public abstract class FloatVector extends AbstractVector<Float> {
             res[i] = mbits[i] ? f.apply(i, vec1[i], vec2[i]) : vec1[i];
         }
         return vectorFactory(res);
+    }
+
+    /*package-private*/
+    abstract
+    FloatVector mathBinOp(int opd,
+                           Vector<Float> o,
+                           VectorMask<Float> m,
+                           FBinOp f);
+    @ForceInline
+    final
+    FloatVector mathBinOpTemplate(int opd,
+                                   Vector<Float> o,
+                                   VectorMask<Float> m,
+                                   FBinOp f) {
+        if (VectorSupport.hasNativeImpl(opd, float.class, length())) {
+            float[] vec1 = vec();
+            float[] vec2 = ((FloatVector)o).vec();
+            Object obj = VectorSupport.nativeImpl(opd, float.class, length(), vec1, vec2);
+            if (obj != null) {
+                float[] res = (float[]) obj;
+                if (m != null) {
+                    boolean[] mbits = ((AbstractMask<Float>)m).getBits();
+                    for (int i = 0; i < res.length; i++) {
+                        res[i] = mbits[i] ? res[i] : vec1[i];
+                    }
+                }
+                return vectorFactory(res);
+            }
+        }
+        return bOpTemplate(o, m, f);
     }
 
     // Ternary operator
@@ -708,38 +765,38 @@ public abstract class FloatVector extends AbstractVector<Float> {
                     v0.uOp(m, (i, a) -> (float) -a);
             case VECTOR_OP_ABS: return (v0, m) ->
                     v0.uOp(m, (i, a) -> (float) Math.abs(a));
-            case VECTOR_OP_SIN: return (v0, m) ->
-                    v0.uOp(m, (i, a) -> (float) Math.sin(a));
-            case VECTOR_OP_COS: return (v0, m) ->
-                    v0.uOp(m, (i, a) -> (float) Math.cos(a));
-            case VECTOR_OP_TAN: return (v0, m) ->
-                    v0.uOp(m, (i, a) -> (float) Math.tan(a));
-            case VECTOR_OP_ASIN: return (v0, m) ->
-                    v0.uOp(m, (i, a) -> (float) Math.asin(a));
-            case VECTOR_OP_ACOS: return (v0, m) ->
-                    v0.uOp(m, (i, a) -> (float) Math.acos(a));
-            case VECTOR_OP_ATAN: return (v0, m) ->
-                    v0.uOp(m, (i, a) -> (float) Math.atan(a));
-            case VECTOR_OP_EXP: return (v0, m) ->
-                    v0.uOp(m, (i, a) -> (float) Math.exp(a));
-            case VECTOR_OP_LOG: return (v0, m) ->
-                    v0.uOp(m, (i, a) -> (float) Math.log(a));
-            case VECTOR_OP_LOG10: return (v0, m) ->
-                    v0.uOp(m, (i, a) -> (float) Math.log10(a));
             case VECTOR_OP_SQRT: return (v0, m) ->
                     v0.uOp(m, (i, a) -> (float) Math.sqrt(a));
+            case VECTOR_OP_SIN: return (v0, m) ->
+                    v0.mathUnOp(VECTOR_OP_SIN, m, (i, a) -> (float) Math.sin(a));
+            case VECTOR_OP_COS: return (v0, m) ->
+                    v0.mathUnOp(VECTOR_OP_COS, m, (i, a) -> (float) Math.cos(a));
+            case VECTOR_OP_TAN: return (v0, m) ->
+                    v0.mathUnOp(VECTOR_OP_TAN, m, (i, a) -> (float) Math.tan(a));
+            case VECTOR_OP_ASIN: return (v0, m) ->
+                    v0.mathUnOp(VECTOR_OP_ASIN, m, (i, a) -> (float) Math.asin(a));
+            case VECTOR_OP_ACOS: return (v0, m) ->
+                    v0.mathUnOp(VECTOR_OP_ACOS, m, (i, a) -> (float) Math.acos(a));
+            case VECTOR_OP_ATAN: return (v0, m) ->
+                    v0.mathUnOp(VECTOR_OP_ATAN, m, (i, a) -> (float) Math.atan(a));
+            case VECTOR_OP_EXP: return (v0, m) ->
+                    v0.mathUnOp(VECTOR_OP_EXP, m, (i, a) -> (float) Math.exp(a));
+            case VECTOR_OP_LOG: return (v0, m) ->
+                    v0.mathUnOp(VECTOR_OP_LOG, m, (i, a) -> (float) Math.log(a));
+            case VECTOR_OP_LOG10: return (v0, m) ->
+                    v0.mathUnOp(VECTOR_OP_LOG10, m, (i, a) -> (float) Math.log10(a));
             case VECTOR_OP_CBRT: return (v0, m) ->
-                    v0.uOp(m, (i, a) -> (float) Math.cbrt(a));
+                    v0.mathUnOp(VECTOR_OP_CBRT, m, (i, a) -> (float) Math.cbrt(a));
             case VECTOR_OP_SINH: return (v0, m) ->
-                    v0.uOp(m, (i, a) -> (float) Math.sinh(a));
+                    v0.mathUnOp(VECTOR_OP_SINH, m, (i, a) -> (float) Math.sinh(a));
             case VECTOR_OP_COSH: return (v0, m) ->
-                    v0.uOp(m, (i, a) -> (float) Math.cosh(a));
+                    v0.mathUnOp(VECTOR_OP_COSH, m, (i, a) -> (float) Math.cosh(a));
             case VECTOR_OP_TANH: return (v0, m) ->
-                    v0.uOp(m, (i, a) -> (float) Math.tanh(a));
+                    v0.mathUnOp(VECTOR_OP_TANH, m, (i, a) -> (float) Math.tanh(a));
             case VECTOR_OP_EXPM1: return (v0, m) ->
-                    v0.uOp(m, (i, a) -> (float) Math.expm1(a));
+                    v0.mathUnOp(VECTOR_OP_EXPM1, m, (i, a) -> (float) Math.expm1(a));
             case VECTOR_OP_LOG1P: return (v0, m) ->
-                    v0.uOp(m, (i, a) -> (float) Math.log1p(a));
+                    v0.mathUnOp(VECTOR_OP_LOG1P, m, (i, a) -> (float) Math.log1p(a));
             default: return null;
         }
     }
@@ -832,11 +889,11 @@ public abstract class FloatVector extends AbstractVector<Float> {
             case VECTOR_OP_OR: return (v0, v1, vm) ->
                     v0.bOp(v1, vm, (i, a, b) -> fromBits(toBits(a) | toBits(b)));
             case VECTOR_OP_ATAN2: return (v0, v1, vm) ->
-                    v0.bOp(v1, vm, (i, a, b) -> (float) Math.atan2(a, b));
+                    v0.mathBinOp(VECTOR_OP_ATAN2, v1, vm, (i, a, b) -> (float) Math.atan2(a, b));
             case VECTOR_OP_POW: return (v0, v1, vm) ->
-                    v0.bOp(v1, vm, (i, a, b) -> (float) Math.pow(a, b));
+                    v0.mathBinOp(VECTOR_OP_POW, v1, vm, (i, a, b) -> (float) Math.pow(a, b));
             case VECTOR_OP_HYPOT: return (v0, v1, vm) ->
-                    v0.bOp(v1, vm, (i, a, b) -> (float) Math.hypot(a, b));
+                    v0.mathBinOp(VECTOR_OP_HYPOT, v1, vm, (i, a, b) -> (float) Math.hypot(a, b));
             default: return null;
         }
     }

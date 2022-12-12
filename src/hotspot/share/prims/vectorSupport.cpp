@@ -29,6 +29,7 @@
 #include "code/location.hpp"
 #include "jni.h"
 #include "jvm.h"
+#include "memory/oopFactory.hpp"
 #include "oops/klass.inline.hpp"
 #include "oops/typeArrayOop.inline.hpp"
 #include "prims/vectorSupport.hpp"
@@ -43,7 +44,7 @@
 #endif // COMPILER2
 
 #ifdef COMPILER2
-const char* VectorSupport::svmlname[VectorSupport::NUM_SVML_OP] = {
+const char* VectorSupport::mathname[VectorSupport::NUM_VECTOR_MATH_OP] = {
     "tan",
     "tanh",
     "sin",
@@ -575,6 +576,83 @@ int VectorSupport::vop2ideal(jint id, BasicType bt) {
 }
 #endif // COMPILER2
 
+static bool support_vector_math_stub(BasicType bt, int length) {
+#ifdef COMPILER2
+  int size = length * type2aelembytes(bt);
+  return EnableVectorSupport &&
+         UseVectorStubs &&
+         // The supported min math vector size is 64 bits.
+         8 <= size && size <= MaxVectorSize;
+#else
+  return false;
+#endif // COMPILER2
+}
+
+static address get_vector_math_entry(int vop, int bits, BasicType bt) {
+  address addr = NULL;
+#ifdef COMPILER2
+  assert(vop >= VectorSupport::VECTOR_OP_MATH_START && vop <= VectorSupport::VECTOR_OP_MATH_END, "Not a valid vector math op");
+  int op = vop - VectorSupport::VECTOR_OP_MATH_START;
+
+#ifdef AARCH64
+  if (UseSVE > 0) {
+    if (bt == T_FLOAT) {
+      addr = StubRoutines::_vector_f_math[VectorSupport::VEC_SIZE_SCALABLE][op];
+    } else {
+      assert(bt == T_DOUBLE, "must be FP type only");
+      addr = StubRoutines::_vector_d_math[VectorSupport::VEC_SIZE_SCALABLE][op];
+    }
+    return addr;
+  }
+#endif // AARCH64
+
+  switch(bits) {
+    case 64:  //fallthough
+    case 128: //fallthough
+    case 256: //fallthough
+    case 512: {
+      int size = exact_log2(bits/64);
+      if (bt == T_FLOAT) {
+        addr = StubRoutines::_vector_f_math[size][op];
+      } else {
+        assert(bt == T_DOUBLE, "must be FP type only");
+        addr = StubRoutines::_vector_d_math[size][op];
+      }
+      break;
+    }
+    default:
+      addr = NULL;
+      Unimplemented();
+      break;
+  }
+#endif // COMPILER2
+  return addr;
+}
+
+static address get_vector_math_wrapper(int bits) {
+  address addr = NULL;
+#ifdef COMPILER2
+#ifdef AARCH64
+  if (UseSVE > 0) {
+    return StubRoutines::_vector_math_wrapper[VectorSupport::VEC_SIZE_SCALABLE];
+  }
+#endif // AARCH64
+
+  switch(bits) {
+    case 64:  //fallthough
+    case 128: //fallthough
+    case 256: //fallthough
+    case 512:
+      return StubRoutines::_vector_math_wrapper[exact_log2(bits/64)];
+    default:
+      addr = NULL;
+      Unimplemented();
+      break;
+  }
+#endif // COMPILER2
+  return addr;
+}
+
 /**
  * Implementation of the jdk.internal.vm.vector.VectorSupport class
  */
@@ -590,16 +668,96 @@ JVM_ENTRY(jint, VectorSupport_GetMaxLaneCount(JNIEnv *env, jclass vsclazz, jobje
   return -1;
 } JVM_END
 
+JVM_ENTRY(jboolean, VectorSupport_HasNativeImpl(JNIEnv *env, jclass vsclazz, jint opr, jobject clazz, jint length)) {
+#ifdef COMPILER2
+  oop mirror = JNIHandles::resolve_non_null(clazz);
+  if (java_lang_Class::is_primitive(mirror)) {
+    BasicType bt = java_lang_Class::primitive_type(mirror);
+    if(support_vector_math_stub(bt, length)) {
+      int bits = type2aelembytes(bt) * length * BitsPerByte;
+      return get_vector_math_entry(opr, bits, bt) != NULL;
+    }
+  }
+#endif // COMPILER2
+  return false;
+} JVM_END
+
+JVM_ENTRY(jobject, VectorSupport_NativeImpl(JNIEnv *env, jclass vsclazz, jint opr, jobject clazz, jint length, jobject v1, jobject v2)) {
+#ifdef COMPILER2
+  oop mirror = JNIHandles::resolve_non_null(clazz);
+  if (!java_lang_Class::is_primitive(mirror)) {
+    return nullptr;
+  }
+  BasicType bt = java_lang_Class::primitive_type(mirror);
+
+  // Get the address of the first element of the first input array
+  typeArrayOop src1 = typeArrayOop(JNIHandles::resolve_non_null(v1));
+  typeArrayHandle src1_ah(THREAD, src1);
+  if (length != src1_ah->length()) {
+    return nullptr;
+  }
+  intptr_t* src1_addr = bt == T_FLOAT ? (intptr_t*) src1->float_at_addr(0) : (intptr_t*) src1->double_at_addr(0);
+  if (src1_addr == NULL) {
+    return nullptr;
+  }
+
+  // Get the address of the first element of the second input array
+  typeArrayOop src2 = typeArrayOop(JNIHandles::resolve(v2));
+  intptr_t* src2_addr = NULL;
+  if (src2 != NULL) {
+    src2_addr = bt == T_FLOAT ? (intptr_t*) src2->float_at_addr(0) : (intptr_t*) src2->double_at_addr(0);
+    if (src2_addr == NULL) {
+      return nullptr;
+    }
+  }
+
+  // Get the address of vector math method
+  int bits = type2aelembytes(bt) * length * BitsPerByte;
+  address native_entry = get_vector_math_entry(opr, bits, bt);
+  if (native_entry == NULL) {
+    return nullptr;
+  }
+  address vector_math_wrapper = get_vector_math_wrapper(bits);
+  if (vector_math_wrapper == NULL) {
+    return nullptr;
+  }
+
+  // Define the vector math wrapper function. The argument list is:
+  //   c_rarg0 - the output array address
+  //   c_rarg1 - the first input array address
+  //   c_rarg2 - the second input array address
+  //   c_rarg3 - the native method entry of the vector math implementation
+  //   c_rarg4 - the vector element count
+  //   c_rarg5 - the element type flag, "true" if the type is float
+  //
+  void (*vector_math_native_wrapper)(intptr_t*, intptr_t*, intptr_t*, u_char*, int, bool) =
+    CAST_TO_FN_PTR(void(*)(intptr_t*, intptr_t*, intptr_t*, u_char*, int, bool), vector_math_wrapper);
+
+  // init the dst array
+  typeArrayOop dst = oopFactory::new_typeArray(bt, length, CHECK_NULL);
+  intptr_t* dst_addr = bt == T_FLOAT ? (intptr_t*) dst->float_at_addr(0) : (intptr_t*) dst->double_at_addr(0);
+
+  // Call the vector math stub code
+  vector_math_native_wrapper(dst_addr, src1_addr, src2_addr, native_entry, length, bt == T_FLOAT);
+  return (jobject) JNIHandles::make_local(THREAD, dst);
+#else // COMPILER2
+  return nullptr;
+#endif // COMPILER2
+} JVM_END
+
 // JVM_RegisterVectorSupportMethods
 
 #define LANG "Ljava/lang/"
 #define CLS LANG "Class;"
+#define OBJ LANG "Object;"
 
 #define CC (char*)  /*cast a literal from (const char*)*/
 #define FN_PTR(f) CAST_FROM_FN_PTR(void*, &f)
 
 static JNINativeMethod jdk_internal_vm_vector_VectorSupport_methods[] = {
-    {CC "getMaxLaneCount",   CC "(" CLS ")I", FN_PTR(VectorSupport_GetMaxLaneCount)}
+    {CC "getMaxLaneCount",   CC "(" CLS ")I",                 FN_PTR(VectorSupport_GetMaxLaneCount)},
+    {CC "hasNativeImpl",     CC "(I" CLS "I)Z",               FN_PTR(VectorSupport_HasNativeImpl)},
+    {CC "nativeImpl",        CC "(I" CLS "I" OBJ OBJ ")" OBJ, FN_PTR(VectorSupport_NativeImpl)}
 };
 
 #undef CC

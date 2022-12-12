@@ -198,6 +198,13 @@ final class Double128Vector extends DoubleVector {
             super.uOpTemplate((Double128Mask)m, f);  // specialize
     }
 
+    @ForceInline
+    final @Override
+    Double128Vector mathUnOp(int opd, VectorMask<Double> m, FUnOp f) {
+        return (Double128Vector)
+            super.mathUnOpTemplate(opd, (Double128Mask)m, f);  // specialize
+    }
+
     // Binary operator
 
     @ForceInline
@@ -213,6 +220,13 @@ final class Double128Vector extends DoubleVector {
         return (Double128Vector)
             super.bOpTemplate((Double128Vector)v, (Double128Mask)m,
                               f);  // specialize
+    }
+
+    @ForceInline
+    final @Override
+    Double128Vector mathBinOp(int opd, Vector<Double> v, VectorMask<Double> m, FBinOp f) {
+        return (Double128Vector)
+            super.mathBinOpTemplate(opd, (Double128Vector)v, (Double128Mask)m, f);  // specialize
     }
 
     // Ternary operator

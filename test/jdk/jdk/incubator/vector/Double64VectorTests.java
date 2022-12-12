@@ -3745,6 +3745,13 @@ public class Double64VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Double64VectorTests::SIN, Double64VectorTests::strictSIN);
+
+        double[] r2 = new double[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            DoubleVector av = DoubleVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.SIN).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (double _r) -> (_r));
     }
 
     static double EXP(double a) {
@@ -3768,6 +3775,13 @@ public class Double64VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Double64VectorTests::EXP, Double64VectorTests::strictEXP);
+
+        double[] r2 = new double[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            DoubleVector av = DoubleVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.EXP).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (double _r) -> (_r));
     }
 
     static double LOG1P(double a) {
@@ -3791,6 +3805,13 @@ public class Double64VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Double64VectorTests::LOG1P, Double64VectorTests::strictLOG1P);
+
+        double[] r2 = new double[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            DoubleVector av = DoubleVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.LOG1P).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (double _r) -> (_r));
     }
 
     static double LOG(double a) {
@@ -3814,6 +3835,13 @@ public class Double64VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Double64VectorTests::LOG, Double64VectorTests::strictLOG);
+
+        double[] r2 = new double[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            DoubleVector av = DoubleVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.LOG).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (double _r) -> (_r));
     }
 
     static double LOG10(double a) {
@@ -3837,6 +3865,13 @@ public class Double64VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Double64VectorTests::LOG10, Double64VectorTests::strictLOG10);
+
+        double[] r2 = new double[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            DoubleVector av = DoubleVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.LOG10).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (double _r) -> (_r));
     }
 
     static double EXPM1(double a) {
@@ -3860,6 +3895,13 @@ public class Double64VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Double64VectorTests::EXPM1, Double64VectorTests::strictEXPM1);
+
+        double[] r2 = new double[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            DoubleVector av = DoubleVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.EXPM1).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (double _r) -> (_r));
     }
 
     static double COS(double a) {
@@ -3883,6 +3925,13 @@ public class Double64VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Double64VectorTests::COS, Double64VectorTests::strictCOS);
+
+        double[] r2 = new double[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            DoubleVector av = DoubleVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.COS).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (double _r) -> (_r));
     }
 
     static double TAN(double a) {
@@ -3906,6 +3955,13 @@ public class Double64VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Double64VectorTests::TAN, Double64VectorTests::strictTAN);
+
+        double[] r2 = new double[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            DoubleVector av = DoubleVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.TAN).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (double _r) -> (_r));
     }
 
     static double SINH(double a) {
@@ -3929,6 +3985,13 @@ public class Double64VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Double64VectorTests::SINH, Double64VectorTests::strictSINH);
+
+        double[] r2 = new double[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            DoubleVector av = DoubleVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.SINH).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (double _r) -> (_r));
     }
 
     static double COSH(double a) {
@@ -3952,6 +4015,13 @@ public class Double64VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Double64VectorTests::COSH, Double64VectorTests::strictCOSH);
+
+        double[] r2 = new double[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            DoubleVector av = DoubleVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.COSH).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (double _r) -> (_r));
     }
 
     static double TANH(double a) {
@@ -3975,6 +4045,13 @@ public class Double64VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Double64VectorTests::TANH, Double64VectorTests::strictTANH);
+
+        double[] r2 = new double[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            DoubleVector av = DoubleVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.TANH).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (double _r) -> (_r));
     }
 
     static double ASIN(double a) {
@@ -3998,6 +4075,13 @@ public class Double64VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Double64VectorTests::ASIN, Double64VectorTests::strictASIN);
+
+        double[] r2 = new double[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            DoubleVector av = DoubleVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.ASIN).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (double _r) -> (_r));
     }
 
     static double ACOS(double a) {
@@ -4021,6 +4105,13 @@ public class Double64VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Double64VectorTests::ACOS, Double64VectorTests::strictACOS);
+
+        double[] r2 = new double[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            DoubleVector av = DoubleVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.ACOS).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (double _r) -> (_r));
     }
 
     static double ATAN(double a) {
@@ -4044,6 +4135,13 @@ public class Double64VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Double64VectorTests::ATAN, Double64VectorTests::strictATAN);
+
+        double[] r2 = new double[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            DoubleVector av = DoubleVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.ATAN).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (double _r) -> (_r));
     }
 
     static double CBRT(double a) {
@@ -4067,6 +4165,13 @@ public class Double64VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Double64VectorTests::CBRT, Double64VectorTests::strictCBRT);
+
+        double[] r2 = new double[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            DoubleVector av = DoubleVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.CBRT).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (double _r) -> (_r));
     }
 
     static double HYPOT(double a, double b) {
@@ -4092,6 +4197,14 @@ public class Double64VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, b, Double64VectorTests::HYPOT, Double64VectorTests::strictHYPOT);
+
+        double[] r2 = new double[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            DoubleVector av = DoubleVector.fromArray(SPECIES, a, i);
+            DoubleVector bv = DoubleVector.fromArray(SPECIES, b, i);
+            av.lanewise(VectorOperators.HYPOT, bv).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (double _r) -> (_r));
     }
 
 
@@ -4118,6 +4231,14 @@ public class Double64VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, b, Double64VectorTests::POW, Double64VectorTests::strictPOW);
+
+        double[] r2 = new double[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            DoubleVector av = DoubleVector.fromArray(SPECIES, a, i);
+            DoubleVector bv = DoubleVector.fromArray(SPECIES, b, i);
+            av.lanewise(VectorOperators.POW, bv).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (double _r) -> (_r));
     }
 
 
@@ -4144,6 +4265,14 @@ public class Double64VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, b, Double64VectorTests::pow, Double64VectorTests::strictpow);
+
+        double[] r2 = new double[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            DoubleVector av = DoubleVector.fromArray(SPECIES, a, i);
+            DoubleVector bv = DoubleVector.fromArray(SPECIES, b, i);
+            av.pow(bv).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (double _r) -> (_r));
     }
 
 
@@ -4170,6 +4299,14 @@ public class Double64VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, b, Double64VectorTests::ATAN2, Double64VectorTests::strictATAN2);
+
+        double[] r2 = new double[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            DoubleVector av = DoubleVector.fromArray(SPECIES, a, i);
+            DoubleVector bv = DoubleVector.fromArray(SPECIES, b, i);
+            av.lanewise(VectorOperators.ATAN2, bv).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (double _r) -> (_r));
     }
 
 

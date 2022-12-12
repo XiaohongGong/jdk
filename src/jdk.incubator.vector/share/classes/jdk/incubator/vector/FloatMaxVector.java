@@ -198,6 +198,13 @@ final class FloatMaxVector extends FloatVector {
             super.uOpTemplate((FloatMaxMask)m, f);  // specialize
     }
 
+    @ForceInline
+    final @Override
+    FloatMaxVector mathUnOp(int opd, VectorMask<Float> m, FUnOp f) {
+        return (FloatMaxVector)
+            super.mathUnOpTemplate(opd, (FloatMaxMask)m, f);  // specialize
+    }
+
     // Binary operator
 
     @ForceInline
@@ -213,6 +220,13 @@ final class FloatMaxVector extends FloatVector {
         return (FloatMaxVector)
             super.bOpTemplate((FloatMaxVector)v, (FloatMaxMask)m,
                               f);  // specialize
+    }
+
+    @ForceInline
+    final @Override
+    FloatMaxVector mathBinOp(int opd, Vector<Float> v, VectorMask<Float> m, FBinOp f) {
+        return (FloatMaxVector)
+            super.mathBinOpTemplate(opd, (FloatMaxVector)v, (FloatMaxMask)m, f);  // specialize
     }
 
     // Ternary operator

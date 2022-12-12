@@ -3756,6 +3756,13 @@ public class Float256VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Float256VectorTests::SIN, Float256VectorTests::strictSIN);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.SIN).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float EXP(float a) {
@@ -3779,6 +3786,13 @@ public class Float256VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Float256VectorTests::EXP, Float256VectorTests::strictEXP);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.EXP).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float LOG1P(float a) {
@@ -3802,6 +3816,13 @@ public class Float256VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Float256VectorTests::LOG1P, Float256VectorTests::strictLOG1P);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.LOG1P).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float LOG(float a) {
@@ -3825,6 +3846,13 @@ public class Float256VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Float256VectorTests::LOG, Float256VectorTests::strictLOG);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.LOG).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float LOG10(float a) {
@@ -3848,6 +3876,13 @@ public class Float256VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Float256VectorTests::LOG10, Float256VectorTests::strictLOG10);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.LOG10).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float EXPM1(float a) {
@@ -3871,6 +3906,13 @@ public class Float256VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Float256VectorTests::EXPM1, Float256VectorTests::strictEXPM1);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.EXPM1).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float COS(float a) {
@@ -3894,6 +3936,13 @@ public class Float256VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Float256VectorTests::COS, Float256VectorTests::strictCOS);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.COS).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float TAN(float a) {
@@ -3917,6 +3966,13 @@ public class Float256VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Float256VectorTests::TAN, Float256VectorTests::strictTAN);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.TAN).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float SINH(float a) {
@@ -3940,6 +3996,13 @@ public class Float256VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Float256VectorTests::SINH, Float256VectorTests::strictSINH);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.SINH).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float COSH(float a) {
@@ -3963,6 +4026,13 @@ public class Float256VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Float256VectorTests::COSH, Float256VectorTests::strictCOSH);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.COSH).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float TANH(float a) {
@@ -3986,6 +4056,13 @@ public class Float256VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Float256VectorTests::TANH, Float256VectorTests::strictTANH);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.TANH).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float ASIN(float a) {
@@ -4009,6 +4086,13 @@ public class Float256VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Float256VectorTests::ASIN, Float256VectorTests::strictASIN);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.ASIN).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float ACOS(float a) {
@@ -4032,6 +4116,13 @@ public class Float256VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Float256VectorTests::ACOS, Float256VectorTests::strictACOS);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.ACOS).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float ATAN(float a) {
@@ -4055,6 +4146,13 @@ public class Float256VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Float256VectorTests::ATAN, Float256VectorTests::strictATAN);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.ATAN).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float CBRT(float a) {
@@ -4078,6 +4176,13 @@ public class Float256VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, Float256VectorTests::CBRT, Float256VectorTests::strictCBRT);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.CBRT).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float HYPOT(float a, float b) {
@@ -4103,6 +4208,14 @@ public class Float256VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, b, Float256VectorTests::HYPOT, Float256VectorTests::strictHYPOT);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            FloatVector bv = FloatVector.fromArray(SPECIES, b, i);
+            av.lanewise(VectorOperators.HYPOT, bv).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
 
@@ -4129,6 +4242,14 @@ public class Float256VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, b, Float256VectorTests::POW, Float256VectorTests::strictPOW);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            FloatVector bv = FloatVector.fromArray(SPECIES, b, i);
+            av.lanewise(VectorOperators.POW, bv).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
 
@@ -4155,6 +4276,14 @@ public class Float256VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, b, Float256VectorTests::pow, Float256VectorTests::strictpow);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            FloatVector bv = FloatVector.fromArray(SPECIES, b, i);
+            av.pow(bv).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
 
@@ -4181,6 +4310,14 @@ public class Float256VectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, b, Float256VectorTests::ATAN2, Float256VectorTests::strictATAN2);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            FloatVector bv = FloatVector.fromArray(SPECIES, b, i);
+            av.lanewise(VectorOperators.ATAN2, bv).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
 

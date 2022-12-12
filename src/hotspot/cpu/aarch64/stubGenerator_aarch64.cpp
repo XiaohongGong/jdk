@@ -4570,6 +4570,100 @@ class StubGenerator: public StubCodeGenerator {
   // Arguments:
   //
   // Input:
+  //   c_rarg0   - the output array address
+  //   c_rarg1   - the first input array address
+  //   c_rarg2   - the second input array address
+  //   c_rarg3   - the native method entry of the vector math implementation
+  //   c_rarg4   - the vector element count
+  //   c_rarg5   - the element type flag, "true" if the type is float
+  //
+  address generate_vector_math_wrapper(int size) {
+    __ align(CodeEntryAlignment);
+    StubCodeMark mark(this, "StubRoutines", "vectorMathWrapper");
+
+    address start = __ pc();
+
+    const Register dst      = c_rarg0;
+    const Register src1     = c_rarg1;
+    const Register src2     = c_rarg2;
+    const Register entry    = c_rarg3;
+    const Register length   = c_rarg4;
+    const Register is_float = c_rarg5;
+
+    BLOCK_COMMENT("Entry:");
+    __ enter();
+
+    Label DONE;
+
+    if (size == VectorSupport::VEC_SIZE_SCALABLE && UseSVE > 0) {
+      Label SVE_DOUBLE_MATH, SVE_DOUBLE_CALL_ENTRY, SVE_FLOAT_CALL_ENTRY;
+
+      // Save registers before call
+      __ stp(dst, length, Address(__ pre(sp, -2 * wordSize)));
+
+      // Check the vector element type
+      __ cbz(is_float, SVE_DOUBLE_MATH);
+
+      // Load float vector inputs
+      __ sve_whilelow(p0, __ S, zr, length);
+      __ sve_ld1w(v0, __ S, p0, Address(src1));
+      __ cbz(src2, SVE_FLOAT_CALL_ENTRY);
+      __ sve_ld1w(v1, __ S, p0, Address(src2));
+
+      // Call method in the vector math library
+      __ bind(SVE_FLOAT_CALL_ENTRY);
+      __ blr(entry);
+      // Restore saved registers
+      __ ldp(dst, length, Address(__ post(sp, 2 * wordSize)));
+      // Store float vector result
+      __ sve_whilelow(p0, __ S, zr, length);
+      __ sve_st1w(v0, __ S, p0, Address(dst));
+      // Jump to end
+      __ b(DONE);
+
+      __ bind(SVE_DOUBLE_MATH);
+
+      // Load double vector inputs
+      __ sve_whilelow(p0, __ D, zr, length);
+      __ sve_ld1d(v0, __ D, p0, Address(src1));
+      __ cbz(src2, SVE_DOUBLE_CALL_ENTRY);
+      __ sve_ld1d(v1, __ D, p0, Address(src2));
+
+      // Call method in the vector math library
+      __ bind(SVE_DOUBLE_CALL_ENTRY);
+      __ blr(entry);
+      // Restore saved registers
+      __ ldp(dst, length, Address(__ post(sp, 2 * wordSize)));
+      // Store double vector result
+      __ sve_whilelow(p0, __ D, zr, length);
+      __ sve_st1d(v0, __ D, p0, Address(dst));
+    } else {
+      Label CALL_ENTRY;
+
+      // Save registers before call
+      __ stp(dst, src1, Address(__ pre(sp, -2 * wordSize)));
+      // Load vector inputs
+      __ ldr(v0, __ Q, Address(src1));
+      __ cbz(src2, CALL_ENTRY);
+      __ ldr(v1, __ Q, Address(src2));
+      // Call method in the vector math library
+      __ bind(CALL_ENTRY);
+      __ blr(entry);
+      // Restore saved registers
+      __ ldp(dst, src1, Address(__ post(sp, 2 * wordSize)));
+      // Store vector result
+      __ str(v0, __ Q, Address(dst));
+    }
+
+    __ bind(DONE);
+    __ leave();
+    __ ret(lr);
+    return start;
+  }
+
+  // Arguments:
+  //
+  // Input:
   //   c_rarg0   - newArr address
   //   c_rarg1   - oldArr address
   //   c_rarg2   - newIdx
@@ -8098,6 +8192,68 @@ class StubGenerator: public StubCodeGenerator {
     if (UseAdler32Intrinsics) {
       StubRoutines::_updateBytesAdler32 = generate_updateBytesAdler32();
     }
+
+#ifdef COMPILER2
+    // Get sleef stub routine addresses
+    char ebuf[1024];
+    void* libsleef = os::dll_load("libsleef.so.3", ebuf, sizeof ebuf);
+    if (libsleef != NULL) {
+      // SLEEF method naming convention
+      //   All the methods are named as Sleef_<OP><T><N>_<U><suffix>
+      //   Where:
+      //     <OP>     is the operation name, e.g. sin
+      //     <T>      is optional to indicate float/double
+      //              "f/d" for vector float/double operation
+      //     <N>      is the number of elements in the vector
+      //              "2/4" for neon, and "x" for sve
+      //     <U>      is the precision level
+      //              "u10/u05" represents 1.0/0.5 ULP error bounds
+      //               We use "u10" for all operations by default
+      //               But for those functions do not have u10 support in SLEEF, we use "u05" instead
+      //     <suffix> indicates neon/sve
+      //              "sve/advsimd" for sve/neon implementations
+      //     e.g. Sleef_sinfx_u10sve is the method for computing vector float sin using SVE instructions
+      //          Sleef_cosd2_u10advsimd is the method for computing 2 elements vector double cos using NEON instructions
+      //
+      log_info(library)("Loaded library %s, handle " INTPTR_FORMAT, JNI_LIB_PREFIX "sleef" JNI_LIB_SUFFIX, p2i(libsleef));
+      const char* ulf = "u10";
+      if (UseSVE > 0) {
+        for (int op = 0; op < VectorSupport::NUM_VECTOR_MATH_OP; op++) {
+          int vop = VectorSupport::VECTOR_OP_MATH_START + op;
+          // TODO: use "u10" level once SLEEF support it for "hypot"
+          if (vop == VectorSupport::VECTOR_OP_HYPOT) {
+            ulf = "u05";
+          }
+          snprintf(ebuf, sizeof(ebuf), "Sleef_%sfx_%ssve", VectorSupport::mathname[op], ulf);
+          StubRoutines::_vector_f_math[VectorSupport::VEC_SIZE_SCALABLE][op] = (address)os::dll_lookup(libsleef, ebuf);
+
+          snprintf(ebuf, sizeof(ebuf), "Sleef_%sdx_%ssve", VectorSupport::mathname[op], ulf);
+          StubRoutines::_vector_d_math[VectorSupport::VEC_SIZE_SCALABLE][op] = (address)os::dll_lookup(libsleef, ebuf);
+        }
+        StubRoutines::_vector_math_wrapper[VectorSupport::VEC_SIZE_SCALABLE] =
+                      generate_vector_math_wrapper(VectorSupport::VEC_SIZE_SCALABLE);
+      } else {
+        // Math vector stubs implemented with NEON for 128-bit vector size. The vector math
+        // operations with 64-bit vector size are not supported in SLEEF now.
+        for (int op = 0; op < VectorSupport::NUM_VECTOR_MATH_OP; op++) {
+          int vop = VectorSupport::VECTOR_OP_MATH_START + op;
+          // TODO: use "u10" level once SLEEF support it for "hypot"
+          if (vop == VectorSupport::VECTOR_OP_HYPOT) {
+            ulf = "u05";
+          }
+          snprintf(ebuf, sizeof(ebuf), "Sleef_%sf4_%sadvsimd", VectorSupport::mathname[op], ulf);
+          StubRoutines::_vector_f_math[VectorSupport::VEC_SIZE_128][op] = (address)os::dll_lookup(libsleef, ebuf);
+
+          snprintf(ebuf, sizeof(ebuf), "Sleef_%sd2_%sadvsimd", VectorSupport::mathname[op], ulf);
+          StubRoutines::_vector_d_math[VectorSupport::VEC_SIZE_128][op] = (address)os::dll_lookup(libsleef, ebuf);
+        }
+        StubRoutines::_vector_math_wrapper[VectorSupport::VEC_SIZE_128] =
+                      generate_vector_math_wrapper(VectorSupport::VEC_SIZE_128);
+      }
+    } else {
+      log_info(library)("Fail to load libsleef");
+    }
+#endif // COMPILER2
 
     StubRoutines::aarch64::_spin_wait = generate_spin_wait();
 

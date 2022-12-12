@@ -538,12 +538,12 @@ bool LibraryCallKit::inline_vector_nary_operation(int n) {
   Node* operation = NULL;
   if (opc == Op_CallLeafVector) {
     assert(UseVectorStubs, "sanity");
-    operation = gen_call_to_svml(opr->get_con(), elem_bt, num_elem, opd1, opd2);
+    operation = gen_call_to_vector_math(opr->get_con(), elem_bt, num_elem, opd1, opd2);
     if (operation == NULL) {
       if (C->print_intrinsics()) {
-        tty->print_cr("  ** svml call failed for %s_%s_%d",
-                         (elem_bt == T_FLOAT)?"float":"double",
-                         VectorSupport::svmlname[opr->get_con() - VectorSupport::VECTOR_OP_SVML_START],
+        tty->print_cr("  ** Vector math call failed for %s_%s_%d",
+                         (elem_bt == T_FLOAT) ? "float" : "double",
+                         VectorSupport::mathname[opr->get_con() - VectorSupport::VECTOR_OP_MATH_START],
                          num_elem * type2aelembytes(elem_bt));
       }
       return false;
@@ -2143,49 +2143,60 @@ bool LibraryCallKit::inline_vector_rearrange() {
   return true;
 }
 
-static address get_svml_address(int vop, int bits, BasicType bt, char* name_ptr, int name_len) {
+static address get_vector_math_address(int vop, int bits, BasicType bt, char* name_ptr, int name_len) {
   address addr = NULL;
   assert(UseVectorStubs, "sanity");
   assert(name_ptr != NULL, "unexpected");
-  assert((vop >= VectorSupport::VECTOR_OP_SVML_START) && (vop <= VectorSupport::VECTOR_OP_SVML_END), "unexpected");
-  int op = vop - VectorSupport::VECTOR_OP_SVML_START;
+  assert((vop >= VectorSupport::VECTOR_OP_MATH_START) && (vop <= VectorSupport::VECTOR_OP_MATH_END), "unexpected");
+  int op = vop - VectorSupport::VECTOR_OP_MATH_START;
 
-  switch(bits) {
-    case 64:  //fallthough
-    case 128: //fallthough
-    case 256: //fallthough
-    case 512:
-      if (bt == T_FLOAT) {
-        snprintf(name_ptr, name_len, "vector_%s_float%d", VectorSupport::svmlname[op], bits);
-        addr = StubRoutines::_vector_f_math[exact_log2(bits/64)][op];
-      } else {
-        assert(bt == T_DOUBLE, "must be FP type only");
-        snprintf(name_ptr, name_len, "vector_%s_double%d", VectorSupport::svmlname[op], bits);
-        addr = StubRoutines::_vector_d_math[exact_log2(bits/64)][op];
-      }
-      break;
-    default:
-      snprintf(name_ptr, name_len, "invalid");
-      addr = NULL;
-      Unimplemented();
-      break;
+  if (Matcher::supports_scalable_vector()) {
+    if (bt == T_FLOAT) {
+      snprintf(name_ptr, name_len, "vector_%s_float_%dbits", VectorSupport::mathname[op], bits);
+      addr = StubRoutines::_vector_f_math[VectorSupport::VEC_SIZE_SCALABLE][op];
+    } else {
+      assert(bt == T_DOUBLE, "must be FP type only");
+      snprintf(name_ptr, name_len, "vector_%s_double_%dbits", VectorSupport::mathname[op], bits);
+      addr = StubRoutines::_vector_d_math[VectorSupport::VEC_SIZE_SCALABLE][op];
+    }
+  } else {
+    switch(bits) {
+      case 64:  //fallthough
+      case 128: //fallthough
+      case 256: //fallthough
+      case 512:
+        if (bt == T_FLOAT) {
+          snprintf(name_ptr, name_len, "vector_%s_float_%dbits", VectorSupport::mathname[op], bits);
+          addr = StubRoutines::_vector_f_math[exact_log2(bits/64)][op];
+        } else {
+          assert(bt == T_DOUBLE, "must be FP type only");
+          snprintf(name_ptr, name_len, "vector_%s_double_%dbits", VectorSupport::mathname[op], bits);
+          addr = StubRoutines::_vector_d_math[exact_log2(bits/64)][op];
+        }
+        break;
+      default:
+        snprintf(name_ptr, name_len, "invalid");
+        addr = NULL;
+        Unimplemented();
+        break;
+    }
   }
-
   return addr;
 }
 
-Node* LibraryCallKit::gen_call_to_svml(int vector_api_op_id, BasicType bt, int num_elem, Node* opd1, Node* opd2) {
+Node* LibraryCallKit::gen_call_to_vector_math(int vector_api_op_id, BasicType bt, int num_elem, Node* opd1, Node* opd2) {
   assert(UseVectorStubs, "sanity");
-  assert(vector_api_op_id >= VectorSupport::VECTOR_OP_SVML_START && vector_api_op_id <= VectorSupport::VECTOR_OP_SVML_END, "need valid op id");
+  assert(vector_api_op_id >= VectorSupport::VECTOR_OP_MATH_START && vector_api_op_id <= VectorSupport::VECTOR_OP_MATH_END, "need valid op id");
   assert(opd1 != NULL, "must not be null");
   const TypeVect* vt = TypeVect::make(bt, num_elem);
   const TypeFunc* call_type = OptoRuntime::Math_Vector_Vector_Type(opd2 != NULL ? 2 : 1, vt, vt);
   char name[100] = "";
 
-  // Get address for svml method.
-  address addr = get_svml_address(vector_api_op_id, vt->length_in_bytes() * BitsPerByte, bt, name, 100);
+  // Get address for vector math method.
+  address addr = get_vector_math_address(vector_api_op_id, vt->length_in_bytes() * BitsPerByte, bt, name, 100);
 
   if (addr == NULL) {
+    tty->print_cr("addr for vector math stub is not found!");
     return NULL;
   }
 

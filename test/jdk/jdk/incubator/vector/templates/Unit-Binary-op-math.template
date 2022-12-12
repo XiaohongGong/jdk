@@ -11,5 +11,13 @@
     static void [[TEST]]$vectorteststype$(IntFunction<$type$[]> fa, IntFunction<$type$[]> fb) {
 [[KERNEL]]
         assertArraysEqualsWithinOneUlp(r, a, b, $vectorteststype$::[[TEST]], $vectorteststype$::strict[[TEST]]);
+
+        $type$[] r2 = new $type$[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            $abstractvectortype$ av = $abstractvectortype$.fromArray(SPECIES, a, i);
+            $abstractvectortype$ bv = $abstractvectortype$.fromArray(SPECIES, b, i);
+            av.lanewise(VectorOperators.[[TEST]], bv).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, ($type$ _r) -> (_r));
     }
 

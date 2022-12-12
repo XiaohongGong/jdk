@@ -3761,6 +3761,13 @@ public class FloatMaxVectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, FloatMaxVectorTests::SIN, FloatMaxVectorTests::strictSIN);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.SIN).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float EXP(float a) {
@@ -3784,6 +3791,13 @@ public class FloatMaxVectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, FloatMaxVectorTests::EXP, FloatMaxVectorTests::strictEXP);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.EXP).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float LOG1P(float a) {
@@ -3807,6 +3821,13 @@ public class FloatMaxVectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, FloatMaxVectorTests::LOG1P, FloatMaxVectorTests::strictLOG1P);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.LOG1P).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float LOG(float a) {
@@ -3830,6 +3851,13 @@ public class FloatMaxVectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, FloatMaxVectorTests::LOG, FloatMaxVectorTests::strictLOG);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.LOG).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float LOG10(float a) {
@@ -3853,6 +3881,13 @@ public class FloatMaxVectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, FloatMaxVectorTests::LOG10, FloatMaxVectorTests::strictLOG10);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.LOG10).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float EXPM1(float a) {
@@ -3876,6 +3911,13 @@ public class FloatMaxVectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, FloatMaxVectorTests::EXPM1, FloatMaxVectorTests::strictEXPM1);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.EXPM1).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float COS(float a) {
@@ -3899,6 +3941,13 @@ public class FloatMaxVectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, FloatMaxVectorTests::COS, FloatMaxVectorTests::strictCOS);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.COS).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float TAN(float a) {
@@ -3922,6 +3971,13 @@ public class FloatMaxVectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, FloatMaxVectorTests::TAN, FloatMaxVectorTests::strictTAN);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.TAN).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float SINH(float a) {
@@ -3945,6 +4001,13 @@ public class FloatMaxVectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, FloatMaxVectorTests::SINH, FloatMaxVectorTests::strictSINH);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.SINH).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float COSH(float a) {
@@ -3968,6 +4031,13 @@ public class FloatMaxVectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, FloatMaxVectorTests::COSH, FloatMaxVectorTests::strictCOSH);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.COSH).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float TANH(float a) {
@@ -3991,6 +4061,13 @@ public class FloatMaxVectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, FloatMaxVectorTests::TANH, FloatMaxVectorTests::strictTANH);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.TANH).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float ASIN(float a) {
@@ -4014,6 +4091,13 @@ public class FloatMaxVectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, FloatMaxVectorTests::ASIN, FloatMaxVectorTests::strictASIN);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.ASIN).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float ACOS(float a) {
@@ -4037,6 +4121,13 @@ public class FloatMaxVectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, FloatMaxVectorTests::ACOS, FloatMaxVectorTests::strictACOS);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.ACOS).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float ATAN(float a) {
@@ -4060,6 +4151,13 @@ public class FloatMaxVectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, FloatMaxVectorTests::ATAN, FloatMaxVectorTests::strictATAN);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.ATAN).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float CBRT(float a) {
@@ -4083,6 +4181,13 @@ public class FloatMaxVectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, FloatMaxVectorTests::CBRT, FloatMaxVectorTests::strictCBRT);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            av.lanewise(VectorOperators.CBRT).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
     static float HYPOT(float a, float b) {
@@ -4108,6 +4213,14 @@ public class FloatMaxVectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, b, FloatMaxVectorTests::HYPOT, FloatMaxVectorTests::strictHYPOT);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            FloatVector bv = FloatVector.fromArray(SPECIES, b, i);
+            av.lanewise(VectorOperators.HYPOT, bv).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
 
@@ -4134,6 +4247,14 @@ public class FloatMaxVectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, b, FloatMaxVectorTests::POW, FloatMaxVectorTests::strictPOW);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            FloatVector bv = FloatVector.fromArray(SPECIES, b, i);
+            av.lanewise(VectorOperators.POW, bv).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
 
@@ -4160,6 +4281,14 @@ public class FloatMaxVectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, b, FloatMaxVectorTests::pow, FloatMaxVectorTests::strictpow);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            FloatVector bv = FloatVector.fromArray(SPECIES, b, i);
+            av.pow(bv).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
 
@@ -4186,6 +4315,14 @@ public class FloatMaxVectorTests extends AbstractVectorTest {
         }
 
         assertArraysEqualsWithinOneUlp(r, a, b, FloatMaxVectorTests::ATAN2, FloatMaxVectorTests::strictATAN2);
+
+        float[] r2 = new float[a.length];
+        for (int i = 0; i < a.length; i += SPECIES.length()) {
+            FloatVector av = FloatVector.fromArray(SPECIES, a, i);
+            FloatVector bv = FloatVector.fromArray(SPECIES, b, i);
+            av.lanewise(VectorOperators.ATAN2, bv).intoArray(r2, i);
+        }
+        assertArraysEquals(r, r2, (float _r) -> (_r));
     }
 
 

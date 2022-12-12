@@ -200,6 +200,15 @@ final class $vectortype$ extends $abstractvectortype$ {
             super.uOpTemplate(($masktype$)m, f);  // specialize
     }
 
+#if[FP]
+    @ForceInline
+    final @Override
+    $vectortype$ mathUnOp(int opd, VectorMask<$Boxtype$> m, FUnOp f) {
+        return ($vectortype$)
+            super.mathUnOpTemplate(opd, ($masktype$)m, f);  // specialize
+    }
+
+#end[FP]
     // Binary operator
 
     @ForceInline
@@ -217,6 +226,15 @@ final class $vectortype$ extends $abstractvectortype$ {
                               f);  // specialize
     }
 
+#if[FP]
+    @ForceInline
+    final @Override
+    $vectortype$ mathBinOp(int opd, Vector<$Boxtype$> v, VectorMask<$Boxtype$> m, FBinOp f) {
+        return ($vectortype$)
+            super.mathBinOpTemplate(opd, ($vectortype$)v, ($masktype$)m, f);  // specialize
+    }
+
+#end[FP]
     // Ternary operator
 
     @ForceInline
