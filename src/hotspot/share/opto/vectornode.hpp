@@ -1116,16 +1116,29 @@ class LoadVectorNode : public LoadNode {
 };
 
 //------------------------------LoadVectorGatherNode------------------------------
-// Load Vector from memory via index map
+// Load Vector from memory via index map. The index map is usually a vector of indices
+// that has the same vector type as the node's bottom type. For non-subword types, it must
+// be. However, for subword types, the basic type of index is int. Hence, the index map
+// can be either a vector with int elements or an address which saves the int indices.
 class LoadVectorGatherNode : public LoadVectorNode {
- public:
-  LoadVectorGatherNode(Node* c, Node* mem, Node* adr, const TypePtr* at, const TypeVect* vt, Node* indices)
+  private:
+   // The basic type of memory, which might be different with the vector element type
+   // when it is a subword type loading.
+   //
+   // For example, when it is a byte type loading, the memory basic type is T_BYTE while
+   // the vector element type of this node is T_INT, if the indices input has a vector
+   // type.
+   BasicType _mem_bt;
+
+  public:
+   LoadVectorGatherNode(Node* c, Node* mem, Node* adr, const TypePtr* at, const TypeVect* vt, Node* indices, BasicType mem_bt)
     : LoadVectorNode(c, mem, adr, at, vt) {
     init_class_id(Class_LoadVectorGather);
     add_req(indices);
     DEBUG_ONLY(bool is_subword = is_subword_type(vt->element_basic_type()));
     assert(is_subword || indices->bottom_type()->is_vect(), "indices must be in vector");
     assert(req() == MemNode::ValueIn + 1, "match_edge expects that index input is in MemNode::ValueIn");
+    _mem_bt = mem_bt;
   }
 
   virtual int Opcode() const;
@@ -1136,6 +1149,8 @@ class LoadVectorGatherNode : public LoadVectorNode {
     // Ensure it is different from any store opcode to avoid folding when indices are used
     return -1;
   }
+  virtual uint size_of() const { return sizeof(*this); }
+  BasicType mem_bt() const { return _mem_bt; }
 };
 
 //------------------------------StoreVectorNode--------------------------------
@@ -1181,8 +1196,8 @@ class StoreVectorNode : public StoreNode {
 };
 
 //------------------------------StoreVectorScatterNode------------------------------
-// Store Vector into memory via index map
-
+// Store Vector into memory via index map. The index map is usually a vector of indices
+// that has the same vector type as the node's bottom type.
  class StoreVectorScatterNode : public StoreVectorNode {
   public:
    enum { Indices = 4 };
@@ -1247,15 +1262,29 @@ class LoadVectorMaskedNode : public LoadVectorNode {
 
 //-------------------------------LoadVectorGatherMaskedNode---------------------------------
 // Load Vector from memory via index map under the influence of a predicate register(mask).
+// The index map is usually a vector of indices that has the same vector type as the node's
+// bottom type. For non-subword types, it must be. However, for subword types, the basic type
+// of index is int. Hence, the index map can be either a vector with int elements or an address
+// which saves the int indices.
 class LoadVectorGatherMaskedNode : public LoadVectorNode {
- public:
-  LoadVectorGatherMaskedNode(Node* c, Node* mem, Node* adr, const TypePtr* at, const TypeVect* vt, Node* indices, Node* mask)
+  private:
+   // The basic type of memory, which might be different with the vector element type when it
+   // is a subword type loading.
+   //
+   // For example, when it is a byte type loading, the memory basic type is T_BYTE while
+   // the vector element type of this node is T_INT, if the indices input has a vector type.
+   BasicType _mem_bt;
+
+  public:
+   LoadVectorGatherMaskedNode(Node* c, Node* mem, Node* adr, const TypePtr* at, const TypeVect* vt,
+                              Node* indices, Node* mask, BasicType mem_bt)
     : LoadVectorNode(c, mem, adr, at, vt) {
     init_class_id(Class_LoadVectorGatherMasked);
     add_req(indices);
     add_req(mask);
     assert(req() == MemNode::ValueIn + 2, "match_edge expects that last input is in MemNode::ValueIn+1");
     assert(is_subword_type(vt->element_basic_type()) || indices->bottom_type()->is_vect(), "indices must be in vector");
+    _mem_bt = mem_bt;
   }
 
   virtual int Opcode() const;
@@ -1266,6 +1295,8 @@ class LoadVectorGatherMaskedNode : public LoadVectorNode {
     // Ensure it is different from any store opcode to avoid folding when indices and mask are used
     return -1;
   }
+  virtual uint size_of() const { return sizeof(*this); }
+  BasicType mem_bt() const { return _mem_bt; }
 };
 
 //------------------------------StoreVectorScatterMaskedNode--------------------------------
@@ -1743,7 +1774,6 @@ class VectorRearrangeNode : public VectorNode {
   Node* vec1() const { return in(1); }
   Node* vec_shuffle() const { return in(2); }
 };
-
 
 // Select elements from two source vectors based on the wrapped indexes held in
 // the first vector.

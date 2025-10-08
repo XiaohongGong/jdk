@@ -3711,6 +3711,42 @@ public abstract class $abstractvectortype$ extends AbstractVector<$Boxtype$> {
             .checkIndexByLane(offset, a.length, vsp.iota(), 1);
         return vsp.dummyVector().fromArray0(a, offset, m, OFFSET_OUT_OF_RANGE);
     }
+#if[byteOrShort]
+
+    @ForceInline
+    private static
+    <M extends VectorMask<$Boxtype$>>
+    $abstractvectortype$ loadWithMap(Class<M> maskClass,
+                           VectorSpecies<$Boxtype$> species,
+                           VectorSpecies<Integer> lsp,
+                           $type$[] a, int offset,
+                           int[] indexMap, int mapOffset, M m) {
+        $Type$Species vsp = ($Type$Species) species;
+        Class<? extends $abstractvectortype$> vectorType = vsp.vectorType();
+
+        // Check indices are within array bounds.
+        IntVector vix = IntVector.fromArray(lsp, indexMap, mapOffset).add(offset);
+        VectorIntrinsics.checkIndex(vix, a.length);
+
+        if (m == null) {
+            return VectorSupport.loadWithMap(
+                vectorType, null, $type$.class, vsp.laneCount(),
+                lsp.vectorType(), lsp.length(),
+                a, ARRAY_BASE, vix, null,
+                a, offset, indexMap, mapOffset, vsp,
+                (c, idx, iMap, idy, s, vm, num) ->
+                s.vOp(n -> n < num ? c[idx + iMap[idy+n]] : 0));
+        }
+
+        return VectorSupport.loadWithMap(
+            vectorType, maskClass, $type$.class, vsp.laneCount(),
+            lsp.vectorType(), lsp.length(),
+            a, ARRAY_BASE, vix, m,
+            a, offset, indexMap, mapOffset, vsp,
+            (c, idx, iMap, idy, s, vm, num) ->
+            s.vOp(vm, n -> n < num ? c[idx + iMap[idy+n]] : 0));
+    }
+#end[byteOrShort]
 
     /**
      * Gathers a new vector composed of elements from an array of type
@@ -3753,8 +3789,6 @@ public abstract class $abstractvectortype$ extends AbstractVector<$Boxtype$> {
         IntVector.IntSpecies isp = IntVector.species(vsp.indexShape());
         Objects.requireNonNull(a);
         Objects.requireNonNull(indexMap);
-        Class<? extends $abstractvectortype$> vectorType = vsp.vectorType();
-
 
         // Constant folding should sweep out following conditonal logic.
         VectorSpecies<Integer> lsp;
@@ -3764,44 +3798,18 @@ public abstract class $abstractvectortype$ extends AbstractVector<$Boxtype$> {
             lsp = isp;
         }
 
-        // Check indices are within array bounds.
-        IntVector vix0 = IntVector.fromArray(lsp, indexMap, mapOffset).add(offset);
-        VectorIntrinsics.checkIndex(vix0, a.length);
+        // The first time of gather-load.
+        $abstractvectortype$ vec = loadWithMap(null, vsp, lsp, a, offset, indexMap, mapOffset, null);
 
         int vlen = vsp.length();
         int idx_vlen = lsp.length();
-        IntVector vix1 = null;
-        if (vlen >= idx_vlen * 2) {
-            vix1 = IntVector.fromArray(lsp, indexMap, mapOffset + idx_vlen).add(offset);
-            VectorIntrinsics.checkIndex(vix1, a.length);
+        // The remaining times of gather-load. Result should be merged into vec.
+        for (int i = idx_vlen; i < vlen; i += idx_vlen) {
+            $abstractvectortype$ vec1 = loadWithMap(null, vsp, lsp, a, offset, indexMap, mapOffset + i, null);
+            // Concatenate vec and vec1: vec = [vec, vec1]
+            vec = vec.or(vsp.broadcast(0).slice(vlen - i, vec1));
         }
-
-#if[byte]
-        IntVector vix2 = null;
-        IntVector vix3 = null;
-        if (vlen == idx_vlen * 4) {
-            vix2 = IntVector.fromArray(lsp, indexMap, mapOffset + idx_vlen * 2).add(offset);
-            VectorIntrinsics.checkIndex(vix2, a.length);
-            vix3 = IntVector.fromArray(lsp, indexMap, mapOffset + idx_vlen * 3).add(offset);
-            VectorIntrinsics.checkIndex(vix3, a.length);
-        }
-
-        return VectorSupport.loadWithMap(
-            vectorType, null, $type$.class, vsp.laneCount(),
-            lsp.vectorType(), lsp.length(),
-            a, ARRAY_BASE, vix0, vix1, vix2, vix3, null,
-            a, offset, indexMap, mapOffset, vsp,
-            (c, idx, iMap, idy, s, vm) ->
-            s.vOp(n -> c[idx + iMap[idy+n]]));
-#else[byte]
-        return VectorSupport.loadWithMap(
-            vectorType, null, $type$.class, vsp.laneCount(),
-            lsp.vectorType(), lsp.length(),
-            a, ARRAY_BASE, vix0, vix1, null, null, null,
-            a, offset, indexMap, mapOffset, vsp,
-            (c, idx, iMap, idy, s, vm) ->
-            s.vOp(n -> c[idx + iMap[idy+n]]));
-#end[byte]
+        return vec;
     }
 #else[byteOrShort]
     @ForceInline
@@ -3850,9 +3858,9 @@ public abstract class $abstractvectortype$ extends AbstractVector<$Boxtype$> {
         return VectorSupport.loadWithMap(
             vectorType, null, $type$.class, vsp.laneCount(),
             isp.vectorType(), isp.length(),
-            a, ARRAY_BASE, vix, null, null, null, null,
+            a, ARRAY_BASE, vix, null,
             a, offset, indexMap, mapOffset, vsp,
-            (c, idx, iMap, idy, s, vm) ->
+            (c, idx, iMap, idy, s, vm, num) ->
             s.vOp(n -> c[idx + iMap[idy+n]]));
     }
 #end[byteOrShort]
@@ -4974,6 +4982,7 @@ public abstract class $abstractvectortype$ extends AbstractVector<$Boxtype$> {
                                     VectorMask<$Boxtype$> m);
 #if[byteOrShort]
     @ForceInline
+    @SuppressWarnings("unchecked")
     final
     <M extends VectorMask<$Boxtype$>>
     $abstractvectortype$ fromArray0Template(Class<M> maskClass, $type$[] a, int offset,
@@ -4983,8 +4992,6 @@ public abstract class $abstractvectortype$ extends AbstractVector<$Boxtype$> {
         Objects.requireNonNull(a);
         Objects.requireNonNull(indexMap);
         m.check(vsp);
-        Class<? extends $abstractvectortype$> vectorType = vsp.vectorType();
-
 
         // Constant folding should sweep out following conditonal logic.
         VectorSpecies<Integer> lsp;
@@ -4994,45 +5001,19 @@ public abstract class $abstractvectortype$ extends AbstractVector<$Boxtype$> {
             lsp = isp;
         }
 
-        // Check indices are within array bounds.
-        // FIXME: Check index under mask controlling.
-        IntVector vix0 = IntVector.fromArray(lsp, indexMap, mapOffset).add(offset);
-        VectorIntrinsics.checkIndex(vix0, a.length);
+        // The first time of gather-load.
+        $abstractvectortype$ vec = loadWithMap(maskClass, vsp, lsp, a, offset, indexMap, mapOffset, m);
 
         int vlen = vsp.length();
         int idx_vlen = lsp.length();
-        IntVector vix1 = null;
-        if (vlen >= idx_vlen * 2) {
-            vix1 = IntVector.fromArray(lsp, indexMap, mapOffset + idx_vlen).add(offset);
-            VectorIntrinsics.checkIndex(vix1, a.length);
+        // The remaining times of gather-load. Result should be merged into vec.
+        for (int i = idx_vlen; i < vlen; i += idx_vlen) {
+            M m1 = (M) m.slice(i);
+            $abstractvectortype$ vec1 = loadWithMap(maskClass, vsp, lsp, a, offset, indexMap, mapOffset + i, m1);
+            // Concatenate vec and vec1: vec = [vec, vec1]
+            vec = vec.or(vsp.broadcast(0).slice(vlen - i, vec1));
         }
-
-#if[byte]
-        IntVector vix2 = null;
-        IntVector vix3 = null;
-        if (vlen == idx_vlen * 4) {
-            vix2 = IntVector.fromArray(lsp, indexMap, mapOffset + idx_vlen * 2).add(offset);
-            VectorIntrinsics.checkIndex(vix2, a.length);
-            vix3 = IntVector.fromArray(lsp, indexMap, mapOffset + idx_vlen * 3).add(offset);
-            VectorIntrinsics.checkIndex(vix3, a.length);
-        }
-
-        return VectorSupport.loadWithMap(
-            vectorType, maskClass, $type$.class, vsp.laneCount(),
-            lsp.vectorType(), lsp.length(),
-            a, ARRAY_BASE, vix0, vix1, vix2, vix3, m,
-            a, offset, indexMap, mapOffset, vsp,
-            (c, idx, iMap, idy, s, vm) ->
-            s.vOp(vm, n -> c[idx + iMap[idy+n]]));
-#else[byte]
-        return VectorSupport.loadWithMap(
-            vectorType, maskClass, $type$.class, vsp.laneCount(),
-            lsp.vectorType(), lsp.length(),
-            a, ARRAY_BASE, vix0, vix1, null, null, m,
-            a, offset, indexMap, mapOffset, vsp,
-            (c, idx, iMap, idy, s, vm) ->
-            s.vOp(vm, n -> c[idx + iMap[idy+n]]));
-#end[byte]
+        return vec;
     }
 #else[byteOrShort]
     @ForceInline
@@ -5083,9 +5064,9 @@ public abstract class $abstractvectortype$ extends AbstractVector<$Boxtype$> {
         return VectorSupport.loadWithMap(
             vectorType, maskClass, $type$.class, vsp.laneCount(),
             isp.vectorType(), isp.length(),
-            a, ARRAY_BASE, vix, null, null, null, m,
+            a, ARRAY_BASE, vix, m,
             a, offset, indexMap, mapOffset, vsp,
-            (c, idx, iMap, idy, s, vm) ->
+            (c, idx, iMap, idy, s, vm, num) ->
             s.vOp(vm, n -> c[idx + iMap[idy+n]]));
     }
 #end[byteOrShort]

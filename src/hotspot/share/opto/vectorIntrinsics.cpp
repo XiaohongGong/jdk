@@ -1192,8 +1192,8 @@ bool LibraryCallKit::inline_vector_mem_masked_operation(bool is_store) {
 //   V loadWithMap(Class<? extends V> vClass, Class<M> mClass, Class<E> eClass, int length,
 //                 Class<? extends Vector<Integer>> vectorIndexClass, int indexLength,
 //                 Object base, long offset,
-//                 W indexVector1, W indexVector2, W indexVector3, W indexVector4,
-//                 M m, C container, int index, int[] indexMap, int indexM, S s,
+//                 W indexVector, M m, C container,
+//                 int index, int[] indexMap, int indexM, S s,
 //                 LoadVectorOperationWithMap<C, V, S, M> defaultImpl)
 //
 //  <C,
@@ -1245,7 +1245,7 @@ bool LibraryCallKit::inline_vector_gather_scatter(bool is_scatter) {
   int num_elem = vlen->get_con();
   int idx_num_elem = idx_vlen->get_con();
 
-  Node* m = is_scatter ? argument(11) : argument(13);
+  Node* m = is_scatter ? argument(11) : argument(10);
   const Type* vmask_type = gvn().type(m);
   bool is_masked_op = vmask_type != TypePtr::NULL_PTR;
   if (is_masked_op) {
@@ -1282,9 +1282,10 @@ bool LibraryCallKit::inline_vector_gather_scatter(bool is_scatter) {
     }
   }
 
-  // Check that the vector holding indices is supported by architecture
-  // For sub-word gathers expander receive index array.
-  if (!is_subword_type(elem_bt) && !arch_supports_vector(Op_LoadVector, idx_num_elem, T_INT, VecMaskNotUsed)) {
+  bool needs_index_address = Matcher::gather_scatter_requires_index_in_address(elem_bt);
+  if (!needs_index_address &&
+      !arch_supports_vector(Op_LoadVector, idx_num_elem, T_INT, VecMaskNotUsed)) {
+    // Check that the vector holding indices is supported by architecture
     log_if_needed("  ** not supported: arity=%d op=%s/loadindex vlen=%d etype=int is_masked_op=%d",
                   is_scatter, is_scatter ? "scatter" : "gather",
                   idx_num_elem, is_masked_op ? 1 : 0);
@@ -1298,14 +1299,15 @@ bool LibraryCallKit::inline_vector_gather_scatter(bool is_scatter) {
   SavedState old_state(this);
 
   Node* addr = nullptr;
-  if (!is_subword_type(elem_bt)) {
+  if (!needs_index_address) {
     addr = make_unsafe_address(base, offset, elem_bt, true);
   } else {
+    assert(is_subword_type(elem_bt), "Only subword gather operation supports non-vector indexes");
     assert(!is_scatter, "Only supports gather operation for subword types now");
     uint header = arrayOopDesc::base_offset_in_bytes(elem_bt);
     assert(offset->is_Con() && offset->bottom_type()->is_long()->get_con() == header,
            "offset must be the array base offset");
-    Node* index = argument(15);
+    Node* index = argument(12);
     addr = array_element_address(base, index, elem_bt);
   }
 
@@ -1330,9 +1332,9 @@ bool LibraryCallKit::inline_vector_gather_scatter(bool is_scatter) {
   // Get the indexes for gather/scatter.
   Node* indexes = nullptr;
   const TypeInstPtr* vbox_idx_type = TypeInstPtr::make_exact(TypePtr::NotNull, vbox_idx_klass);
-  if (is_subword_type(elem_bt)) {
-    Node* indexMap = argument(16);
-    Node* indexM   = argument(17);
+  if (needs_index_address) {
+    Node* indexMap = argument(13);
+    Node* indexM   = argument(14);
     indexes = array_element_address(indexMap, indexM, T_INT);
   } else {
     // Get the first index vector.
@@ -1371,11 +1373,49 @@ bool LibraryCallKit::inline_vector_gather_scatter(bool is_scatter) {
     set_memory(vstore, addr_type);
   } else {
     Node* vload = nullptr;
-    if (mask != nullptr) {
-      vload = gvn().transform(new LoadVectorGatherMaskedNode(control(), memory(addr), addr, addr_type, vector_type, indexes, mask));
-    } else {
-      vload = gvn().transform(new LoadVectorGatherNode(control(), memory(addr), addr, addr_type, vector_type, indexes));
+    const TypeVect* load_vector_type = vector_type;
+
+    // Special vector type handling for subword type loading.
+    if (is_subword_type(elem_bt)) {
+      // Adjust the vector length to length of the index.
+      if (idx_num_elem != num_elem) {
+        load_vector_type = TypeVect::make(elem_bt, idx_num_elem);
+      }
+
+      // Subword type may needs to load with int vector type.
+      if (!needs_index_address) {
+        load_vector_type = TypeVect::make(T_INT, idx_num_elem);
+      }
     }
+
+    int load_num_elem = load_vector_type->length();
+    BasicType load_elem_bt = load_vector_type->element_basic_type();
+
+    if (mask != nullptr) {
+      // Resize the mask to the target vector type.
+      if (load_num_elem != num_elem) {
+        const TypeVect* resize_type = TypeVect::makemask(elem_bt, load_num_elem);
+        mask = gvn().transform(new VectorReinterpretNode(mask, mask->bottom_type()->is_vect(), resize_type));
+      }
+      // Cast the mask if necessary.
+      if (load_elem_bt != elem_bt) {
+        const TypeVect* mask_type = TypeVect::makemask(load_elem_bt, load_num_elem);
+        mask = gvn().transform(new VectorMaskCastNode(mask, mask_type));
+      }
+      vload = gvn().transform(new LoadVectorGatherMaskedNode(control(), memory(addr), addr, addr_type, load_vector_type, indexes, mask, elem_bt));
+    } else {
+      vload = gvn().transform(new LoadVectorGatherNode(control(), memory(addr), addr, addr_type, load_vector_type, indexes, elem_bt));
+    }
+
+    // Cast back the load vector to the target vector type.
+    if (load_elem_bt != elem_bt) {
+      vload = gvn().transform(new VectorCastI2XNode(vload, TypeVect::make(elem_bt, load_num_elem)));
+    }
+    // Resize the load vector to the target vector length.
+    if (load_num_elem != num_elem) {
+      vload = gvn().transform(new VectorReinterpretNode(vload, vload->bottom_type()->is_vect(), vector_type));
+    }
+
     Node* box = box_vector(vload, vbox_type, elem_bt, num_elem);
     set_result(box);
   }
