@@ -629,6 +629,13 @@ final class IntMaxVector extends IntVector {
             return (IntMaxVector) super.toVectorTemplate();  // specialize
         }
 
+        @ForceInline
+        @Override
+        public final
+        IntMaxMask slice(int origin) {
+            return (IntMaxMask) super.sliceTemplate(origin);
+        }
+
         /**
          * Helper function for lane-wise mask conversions.
          * This function kicks in after intrinsic failure.

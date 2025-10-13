@@ -635,6 +635,13 @@ final class Short64Vector extends ShortVector {
             return (Short64Vector) super.toVectorTemplate();  // specialize
         }
 
+        @ForceInline
+        @Override
+        public final
+        Short64Mask slice(int origin) {
+            return (Short64Mask) super.sliceTemplate(origin);
+        }
+
         /**
          * Helper function for lane-wise mask conversions.
          * This function kicks in after intrinsic failure.

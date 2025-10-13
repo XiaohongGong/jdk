@@ -643,6 +643,13 @@ final class Int256Vector extends IntVector {
             return (Int256Vector) super.toVectorTemplate();  // specialize
         }
 
+        @ForceInline
+        @Override
+        public final
+        Int256Mask slice(int origin) {
+            return (Int256Mask) super.sliceTemplate(origin);
+        }
+
         /**
          * Helper function for lane-wise mask conversions.
          * This function kicks in after intrinsic failure.

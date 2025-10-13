@@ -629,6 +629,13 @@ final class ShortMaxVector extends ShortVector {
             return (ShortMaxVector) super.toVectorTemplate();  // specialize
         }
 
+        @ForceInline
+        @Override
+        public final
+        ShortMaxMask slice(int origin) {
+            return (ShortMaxMask) super.sliceTemplate(origin);
+        }
+
         /**
          * Helper function for lane-wise mask conversions.
          * This function kicks in after intrinsic failure.

@@ -620,6 +620,13 @@ final class Float64Vector extends FloatVector {
             return (Float64Vector) super.toVectorTemplate();  // specialize
         }
 
+        @ForceInline
+        @Override
+        public final
+        Float64Mask slice(int origin) {
+            return (Float64Mask) super.sliceTemplate(origin);
+        }
+
         /**
          * Helper function for lane-wise mask conversions.
          * This function kicks in after intrinsic failure.

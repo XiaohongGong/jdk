@@ -619,6 +619,13 @@ final class Long64Vector extends LongVector {
             return (Long64Vector) super.toVectorTemplate();  // specialize
         }
 
+        @ForceInline
+        @Override
+        public final
+        Long64Mask slice(int origin) {
+            return (Long64Mask) super.sliceTemplate(origin);
+        }
+
         /**
          * Helper function for lane-wise mask conversions.
          * This function kicks in after intrinsic failure.

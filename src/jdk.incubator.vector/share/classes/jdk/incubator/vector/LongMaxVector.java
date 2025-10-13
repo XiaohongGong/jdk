@@ -619,6 +619,13 @@ final class LongMaxVector extends LongVector {
             return (LongMaxVector) super.toVectorTemplate();  // specialize
         }
 
+        @ForceInline
+        @Override
+        public final
+        LongMaxMask slice(int origin) {
+            return (LongMaxMask) super.sliceTemplate(origin);
+        }
+
         /**
          * Helper function for lane-wise mask conversions.
          * This function kicks in after intrinsic failure.
