@@ -659,6 +659,13 @@ final class Int512Vector extends IntVector {
             return (Int512Vector) super.toVectorTemplate();  // specialize
         }
 
+        @ForceInline
+        @Override
+        public final
+        Int512Mask slice(int origin) {
+            return (Int512Mask) super.sliceTemplate(origin);
+        }
+
         /**
          * Helper function for lane-wise mask conversions.
          * This function kicks in after intrinsic failure.

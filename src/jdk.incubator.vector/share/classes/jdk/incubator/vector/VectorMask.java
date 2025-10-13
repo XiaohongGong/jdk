@@ -682,6 +682,26 @@ public abstract class VectorMask<E> extends jdk.internal.vm.vector.VectorSupport
      */
     public abstract VectorMask<E> compress();
 
+    /**
+     * Slices a segment of adjacent lanes, starting at a given
+     * {@code origin} lane in the current vector.  A block of
+     * {@code VLENGTH} lanes, possibly padded with zero lanes, is
+     * extracted into its own vector and returned.
+     *
+     * It may also be viewed simply as a cross-lane shift
+     * from later to earlier lanes, with zeroes filling
+     * in the vacated lanes at the end of the vector.
+     * In this view, the shift count is {@code origin}.
+     *
+     * @param origin the first input lane to transfer into the slice
+     * @return the last {@code VLENGTH-origin} input lanes,
+     *         placed starting in the first lane of the output,
+     *         padded at the end with zeroes
+     * @throws ArrayIndexOutOfBoundsException if {@code origin}
+     *         is negative or greater than {@code VLENGTH}
+     */
+    public abstract VectorMask<E> slice(int origin);
+
     // ==== JROSE NAME CHANGES ====
 
     // TYPE CHANGED
