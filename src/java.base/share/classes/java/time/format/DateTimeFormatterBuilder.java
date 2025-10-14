@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2024, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, 2025, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -121,6 +121,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import jdk.internal.util.DateTimeHelper;
 import jdk.internal.util.DecimalDigits;
 
 import sun.text.spi.JavaTimeDateTimePatternProvider;
@@ -161,7 +162,6 @@ import sun.util.locale.provider.TimeZoneNameUtility;
  * @since 1.8
  */
 public final class DateTimeFormatterBuilder {
-
     /**
      * Query for a time-zone that is region-only.
      */
@@ -205,7 +205,7 @@ public final class DateTimeFormatterBuilder {
      * for the requested dateStyle and/or timeStyle.
      * <p>
      * If the locale contains the "rg" (region override)
-     * <a href="../../util/Locale.html#def_locale_extension">Unicode extensions</a>,
+     * {@linkplain Locale##def_locale_extension Unicode extensions},
      * the formatting pattern is overridden with the one appropriate for the region.
      *
      * @param dateStyle  the FormatStyle for the date, null for time-only pattern
@@ -235,7 +235,7 @@ public final class DateTimeFormatterBuilder {
      * for the requested template.
      * <p>
      * If the locale contains the "rg" (region override)
-     * <a href="../../util/Locale.html#def_locale_extension">Unicode extensions</a>,
+     * {@linkplain Locale##def_locale_extension Unicode extensions},
      * the formatting pattern is overridden with the one appropriate for the region.
      * <p>
      * Refer to {@link #appendLocalized(String)} for the detail of {@code requestedTemplate}
@@ -894,8 +894,10 @@ public final class DateTimeFormatterBuilder {
      * {@link DateTimeFormatter#parsedLeapSecond()} for full details.
      * <p>
      * When formatting, the instant will always be suffixed by 'Z' to indicate UTC.
-     * When parsing, the behaviour of {@link DateTimeFormatterBuilder#appendOffsetId()}
-     * will be used to parse the offset, converting the instant to UTC as necessary.
+     * When parsing, the lenient mode behaviour of
+     * {@link DateTimeFormatterBuilder#appendOffset(String, String)
+     * appendOffset("+HH", "Z")} will be used to parse the offset,
+     * converting the instant to UTC as necessary.
      * <p>
      * An alternative to this method is to format/parse the instant as a single
      * epoch-seconds value. That is achieved using {@code appendValue(INSTANT_SECONDS)}.
@@ -956,7 +958,7 @@ public final class DateTimeFormatterBuilder {
      * Appends the zone offset, such as '+01:00', to the formatter.
      * <p>
      * This appends an instruction to format/parse the offset ID to the builder.
-     * This is equivalent to calling {@code appendOffset("+HH:mm:ss", "Z")}.
+     * This is equivalent to calling {@code appendOffset("+HH:MM:ss", "Z")}.
      * See {@link #appendOffset(String, String)} for details on formatting
      * and parsing.
      *
@@ -1097,14 +1099,14 @@ public final class DateTimeFormatterBuilder {
      * During parsing, the text must match a known zone or offset.
      * There are two types of zone ID, offset-based, such as '+01:30' and
      * region-based, such as 'Europe/London'. These are parsed differently.
-     * If the parse starts with '+', '-', 'UT', 'UTC' or 'GMT', then the parser
-     * expects an offset-based zone and will not match region-based zones.
-     * The offset ID, such as '+02:30', may be at the start of the parse,
-     * or prefixed by  'UT', 'UTC' or 'GMT'. The offset ID parsing is
-     * equivalent to using {@link #appendOffset(String, String)} using the
-     * arguments 'HH:MM:ss' and the no offset string '0'.
-     * If the parse starts with 'UT', 'UTC' or 'GMT', and the parser cannot
-     * match a following offset ID, then {@link ZoneOffset#UTC} is selected.
+     * If the parse starts with '+' or '-', then the parser expects an
+     * offset-based zone and will not match region-based zones. The offset
+     * ID parsing is equivalent to using {@link #appendOffset(String, String)}
+     * using the arguments 'HH:MM:ss' and the no offset string '0'.
+     * If the parse starts with 'UT', 'UTC' or 'GMT', and the parser can
+     * match a following offset, then a region-based zone with the parsed
+     * offset will be returned, or else if the parser cannot match a following
+     * offset, then {@link ZoneOffset#UTC} is selected.
      * In all other cases, the list of known region-based zones is used to
      * find the longest available match. If no match is found, and the parse
      * starts with 'Z', then {@code ZoneOffset.UTC} is selected.
@@ -1118,9 +1120,9 @@ public final class DateTimeFormatterBuilder {
      *   "UTC"                     -- ZoneId.of("UTC")
      *   "GMT"                     -- ZoneId.of("GMT")
      *   "+01:30"                  -- ZoneOffset.of("+01:30")
-     *   "UT+01:30"                -- ZoneOffset.of("+01:30")
-     *   "UTC+01:30"               -- ZoneOffset.of("+01:30")
-     *   "GMT+01:30"               -- ZoneOffset.of("+01:30")
+     *   "UT+01:30"                -- ZoneId.of("UT+01:30")
+     *   "UTC+01:30"               -- ZoneId.of("UTC+01:30")
+     *   "GMT+01:30"               -- ZoneId.of("GMT+01:30")
      * </pre>
      *
      * @return this, for chaining, not null
@@ -1135,8 +1137,7 @@ public final class DateTimeFormatterBuilder {
      * Appends the time-zone region ID, such as 'Europe/Paris', to the formatter,
      * rejecting the zone ID if it is a {@code ZoneOffset}.
      * <p>
-     * This appends an instruction to format/parse the zone ID to the builder
-     * only if it is a region-based ID.
+     * This appends an instruction to format only region-based zone IDs to the builder.
      * <p>
      * During formatting, the zone is obtained using a mechanism equivalent
      * to querying the temporal with {@link TemporalQueries#zoneId()}.
@@ -1148,14 +1149,14 @@ public final class DateTimeFormatterBuilder {
      * During parsing, the text must match a known zone or offset.
      * There are two types of zone ID, offset-based, such as '+01:30' and
      * region-based, such as 'Europe/London'. These are parsed differently.
-     * If the parse starts with '+', '-', 'UT', 'UTC' or 'GMT', then the parser
-     * expects an offset-based zone and will not match region-based zones.
-     * The offset ID, such as '+02:30', may be at the start of the parse,
-     * or prefixed by  'UT', 'UTC' or 'GMT'. The offset ID parsing is
-     * equivalent to using {@link #appendOffset(String, String)} using the
-     * arguments 'HH:MM:ss' and the no offset string '0'.
-     * If the parse starts with 'UT', 'UTC' or 'GMT', and the parser cannot
-     * match a following offset ID, then {@link ZoneOffset#UTC} is selected.
+     * If the parse starts with '+' or '-', then the parser expects an
+     * offset-based zone and will not match region-based zones. The offset
+     * ID parsing is equivalent to using {@link #appendOffset(String, String)}
+     * using the arguments 'HH:MM:ss' and the no offset string '0'.
+     * If the parse starts with 'UT', 'UTC' or 'GMT', and the parser can
+     * match a following offset, then a region-based zone with the parsed
+     * offset will be returned, or else if the parser cannot match a following
+     * offset, then {@link ZoneOffset#UTC} is selected.
      * In all other cases, the list of known region-based zones is used to
      * find the longest available match. If no match is found, and the parse
      * starts with 'Z', then {@code ZoneOffset.UTC} is selected.
@@ -1169,9 +1170,9 @@ public final class DateTimeFormatterBuilder {
      *   "UTC"                     -- ZoneId.of("UTC")
      *   "GMT"                     -- ZoneId.of("GMT")
      *   "+01:30"                  -- ZoneOffset.of("+01:30")
-     *   "UT+01:30"                -- ZoneOffset.of("+01:30")
-     *   "UTC+01:30"               -- ZoneOffset.of("+01:30")
-     *   "GMT+01:30"               -- ZoneOffset.of("+01:30")
+     *   "UT+01:30"                -- ZoneId.of("UT+01:30")
+     *   "UTC+01:30"               -- ZoneId.of("UTC+01:30")
+     *   "GMT+01:30"               -- ZoneId.of("GMT+01:30")
      * </pre>
      * <p>
      * Note that this method is identical to {@code appendZoneId()} except
@@ -1206,14 +1207,14 @@ public final class DateTimeFormatterBuilder {
      * During parsing, the text must match a known zone or offset.
      * There are two types of zone ID, offset-based, such as '+01:30' and
      * region-based, such as 'Europe/London'. These are parsed differently.
-     * If the parse starts with '+', '-', 'UT', 'UTC' or 'GMT', then the parser
-     * expects an offset-based zone and will not match region-based zones.
-     * The offset ID, such as '+02:30', may be at the start of the parse,
-     * or prefixed by  'UT', 'UTC' or 'GMT'. The offset ID parsing is
-     * equivalent to using {@link #appendOffset(String, String)} using the
-     * arguments 'HH:MM:ss' and the no offset string '0'.
-     * If the parse starts with 'UT', 'UTC' or 'GMT', and the parser cannot
-     * match a following offset ID, then {@link ZoneOffset#UTC} is selected.
+     * If the parse starts with '+' or '-', then the parser expects an
+     * offset-based zone and will not match region-based zones. The offset
+     * ID parsing is equivalent to using {@link #appendOffset(String, String)}
+     * using the arguments 'HH:MM:ss' and the no offset string '0'.
+     * If the parse starts with 'UT', 'UTC' or 'GMT', and the parser can
+     * match a following offset, then a region-based zone with the parsed
+     * offset will be returned, or else if the parser cannot match a following
+     * offset, then {@link ZoneOffset#UTC} is selected.
      * In all other cases, the list of known region-based zones is used to
      * find the longest available match. If no match is found, and the parse
      * starts with 'Z', then {@code ZoneOffset.UTC} is selected.
@@ -1227,9 +1228,9 @@ public final class DateTimeFormatterBuilder {
      *   "UTC"                     -- ZoneId.of("UTC")
      *   "GMT"                     -- ZoneId.of("GMT")
      *   "+01:30"                  -- ZoneOffset.of("+01:30")
-     *   "UT+01:30"                -- ZoneOffset.of("UT+01:30")
-     *   "UTC+01:30"               -- ZoneOffset.of("UTC+01:30")
-     *   "GMT+01:30"               -- ZoneOffset.of("GMT+01:30")
+     *   "UT+01:30"                -- ZoneId.of("UT+01:30")
+     *   "UTC+01:30"               -- ZoneId.of("UTC+01:30")
+     *   "GMT+01:30"               -- ZoneId.of("GMT+01:30")
      * </pre>
      * <p>
      * Note that this method is identical to {@code appendZoneId()} except
@@ -1936,7 +1937,7 @@ public final class DateTimeFormatterBuilder {
                     padNext(pad); // pad and continue parsing
                 }
                 // main rules
-                TemporalField field = FIELD_MAP.get(cur);
+                TemporalField field = getField(cur);
                 if (field != null) {
                     parseField(cur, count, field);
                 } else if (cur == 'z') {
@@ -2184,48 +2185,55 @@ public final class DateTimeFormatterBuilder {
         }
     }
 
-    /** Map of letters to fields. */
-    private static final Map<Character, TemporalField> FIELD_MAP = new HashMap<>();
-    static {
+    /**
+     * Returns the TemporalField for the given pattern character.
+     *
+     * @param ch the pattern character
+     * @return the TemporalField for the given pattern character, or null if not applicable
+     */
+    private static TemporalField getField(char ch) {
         // SDF = SimpleDateFormat
-        FIELD_MAP.put('G', ChronoField.ERA);                       // SDF, LDML (different to both for 1/2 chars)
-        FIELD_MAP.put('y', ChronoField.YEAR_OF_ERA);               // SDF, LDML
-        FIELD_MAP.put('u', ChronoField.YEAR);                      // LDML (different in SDF)
-        FIELD_MAP.put('Q', IsoFields.QUARTER_OF_YEAR);             // LDML (removed quarter from 310)
-        FIELD_MAP.put('q', IsoFields.QUARTER_OF_YEAR);             // LDML (stand-alone)
-        FIELD_MAP.put('M', ChronoField.MONTH_OF_YEAR);             // SDF, LDML
-        FIELD_MAP.put('L', ChronoField.MONTH_OF_YEAR);             // SDF, LDML (stand-alone)
-        FIELD_MAP.put('D', ChronoField.DAY_OF_YEAR);               // SDF, LDML
-        FIELD_MAP.put('d', ChronoField.DAY_OF_MONTH);              // SDF, LDML
-        FIELD_MAP.put('F', ChronoField.ALIGNED_WEEK_OF_MONTH);     // SDF, LDML
-        FIELD_MAP.put('E', ChronoField.DAY_OF_WEEK);               // SDF, LDML (different to both for 1/2 chars)
-        FIELD_MAP.put('c', ChronoField.DAY_OF_WEEK);               // LDML (stand-alone)
-        FIELD_MAP.put('e', ChronoField.DAY_OF_WEEK);               // LDML (needs localized week number)
-        FIELD_MAP.put('a', ChronoField.AMPM_OF_DAY);               // SDF, LDML
-        FIELD_MAP.put('H', ChronoField.HOUR_OF_DAY);               // SDF, LDML
-        FIELD_MAP.put('k', ChronoField.CLOCK_HOUR_OF_DAY);         // SDF, LDML
-        FIELD_MAP.put('K', ChronoField.HOUR_OF_AMPM);              // SDF, LDML
-        FIELD_MAP.put('h', ChronoField.CLOCK_HOUR_OF_AMPM);        // SDF, LDML
-        FIELD_MAP.put('m', ChronoField.MINUTE_OF_HOUR);            // SDF, LDML
-        FIELD_MAP.put('s', ChronoField.SECOND_OF_MINUTE);          // SDF, LDML
-        FIELD_MAP.put('S', ChronoField.NANO_OF_SECOND);            // LDML (SDF uses milli-of-second number)
-        FIELD_MAP.put('A', ChronoField.MILLI_OF_DAY);              // LDML
-        FIELD_MAP.put('n', ChronoField.NANO_OF_SECOND);            // 310 (proposed for LDML)
-        FIELD_MAP.put('N', ChronoField.NANO_OF_DAY);               // 310 (proposed for LDML)
-        FIELD_MAP.put('g', JulianFields.MODIFIED_JULIAN_DAY);
-        // 310 - z - time-zone names, matches LDML and SimpleDateFormat 1 to 4
-        // 310 - Z - matches SimpleDateFormat and LDML
-        // 310 - V - time-zone id, matches LDML
-        // 310 - v - general timezone names, not matching exactly with LDML because LDML specify to fall back
-        //           to 'VVVV' if general-nonlocation unavailable but here it's not falling back because of lack of data
-        // 310 - p - prefix for padding
-        // 310 - X - matches LDML, almost matches SDF for 1, exact match 2&3, extended 4&5
-        // 310 - x - matches LDML
-        // 310 - w, W, and Y are localized forms matching LDML
-        // LDML - B - day periods
-        // LDML - U - cycle year name, not supported by 310 yet
-        // LDML - l - deprecated
-        // LDML - j - not relevant
+        return switch (ch) {
+            case 'G' -> ChronoField.ERA;                       // SDF, LDML (different to both for 1/2 chars)
+            case 'y' -> ChronoField.YEAR_OF_ERA;               // SDF, LDML
+            case 'u' -> ChronoField.YEAR;                      // LDML (different in SDF)
+            case 'Q' -> IsoFields.QUARTER_OF_YEAR;             // LDML (removed quarter from 310)
+            case 'q' -> IsoFields.QUARTER_OF_YEAR;             // LDML (stand-alone)
+            case 'M' -> ChronoField.MONTH_OF_YEAR;             // SDF, LDML
+            case 'L' -> ChronoField.MONTH_OF_YEAR;             // SDF, LDML (stand-alone)
+            case 'D' -> ChronoField.DAY_OF_YEAR;               // SDF, LDML
+            case 'd' -> ChronoField.DAY_OF_MONTH;              // SDF, LDML
+            case 'F' -> ChronoField.ALIGNED_WEEK_OF_MONTH;     // SDF, LDML
+            case 'E' -> ChronoField.DAY_OF_WEEK;               // SDF, LDML (different to both for 1/2 chars)
+            case 'c' -> ChronoField.DAY_OF_WEEK;               // LDML (stand-alone)
+            case 'e' -> ChronoField.DAY_OF_WEEK;               // LDML (needs localized week number)
+            case 'a' -> ChronoField.AMPM_OF_DAY;               // SDF, LDML
+            case 'H' -> ChronoField.HOUR_OF_DAY;               // SDF, LDML
+            case 'k' -> ChronoField.CLOCK_HOUR_OF_DAY;         // SDF, LDML
+            case 'K' -> ChronoField.HOUR_OF_AMPM;              // SDF, LDML
+            case 'h' -> ChronoField.CLOCK_HOUR_OF_AMPM;        // SDF, LDML
+            case 'm' -> ChronoField.MINUTE_OF_HOUR;            // SDF, LDML
+            case 's' -> ChronoField.SECOND_OF_MINUTE;          // SDF, LDML
+            case 'S' -> ChronoField.NANO_OF_SECOND;            // LDML (SDF uses milli-of-second number)
+            case 'A' -> ChronoField.MILLI_OF_DAY;              // LDML
+            case 'n' -> ChronoField.NANO_OF_SECOND;            // 310 (proposed for LDML)
+            case 'N' -> ChronoField.NANO_OF_DAY;               // 310 (proposed for LDML)
+            case 'g' -> JulianFields.MODIFIED_JULIAN_DAY;
+            default -> null;
+            // 310 - z - time-zone names, matches LDML and SimpleDateFormat 1 to 4
+            // 310 - Z - matches SimpleDateFormat and LDML
+            // 310 - V - time-zone id, matches LDML
+            // 310 - v - general timezone names, not matching exactly with LDML because LDML specify to fall back
+            //           to 'VVVV' if general-nonlocation unavailable but here it's not falling back because of lack of data
+            // 310 - p - prefix for padding
+            // 310 - X - matches LDML, almost matches SDF for 1, exact match 2&3, extended 4&5
+            // 310 - x - matches LDML
+            // 310 - w, W, and Y are localized forms matching LDML
+            // LDML - B - day periods
+            // LDML - U - cycle year name, not supported by 310 yet
+            // LDML - l - deprecated
+            // LDML - j - not relevant
+        };
     }
 
     //-----------------------------------------------------------------------
@@ -3810,56 +3818,71 @@ public final class DateTimeFormatterBuilder {
             }
             long inSec = inSecs;
             int inNano = NANO_OF_SECOND.checkValidIntValue(inNanos != null ? inNanos : 0);
-            // format mostly using LocalDateTime.toString
+            if (fractionalDigits == 0) {
+                inNano = 0;
+            }
+            boolean printNanoInLocalDateTime = fractionalDigits == -2
+                    || (inNano == 0 && (fractionalDigits == 0 || fractionalDigits == -1));
             if (inSec >= -SECONDS_0000_TO_1970) {
-                // current era
-                long zeroSecs = inSec - SECONDS_PER_10000_YEARS + SECONDS_0000_TO_1970;
-                long hi = Math.floorDiv(zeroSecs, SECONDS_PER_10000_YEARS) + 1;
-                long lo = Math.floorMod(zeroSecs, SECONDS_PER_10000_YEARS);
-                LocalDateTime ldt = LocalDateTime.ofEpochSecond(lo - SECONDS_0000_TO_1970, 0, ZoneOffset.UTC);
-                if (hi > 0) {
-                    buf.append('+').append(hi);
-                }
-                buf.append(ldt);
-                if (ldt.getSecond() == 0) {
-                    buf.append(":00");
-                }
+                currentEra(buf, inSec, printNanoInLocalDateTime ? inNano : 0);
             } else {
-                // before current era
-                long zeroSecs = inSec + SECONDS_0000_TO_1970;
-                long hi = zeroSecs / SECONDS_PER_10000_YEARS;
-                long lo = zeroSecs % SECONDS_PER_10000_YEARS;
-                LocalDateTime ldt = LocalDateTime.ofEpochSecond(lo - SECONDS_0000_TO_1970, 0, ZoneOffset.UTC);
-                int pos = buf.length();
-                buf.append(ldt);
-                if (ldt.getSecond() == 0) {
-                    buf.append(":00");
-                }
-                if (hi < 0) {
-                    if (ldt.getYear() == -10_000) {
-                        buf.replace(pos, pos + 2, Long.toString(hi - 1));
-                    } else if (lo == 0) {
-                        buf.insert(pos, hi);
-                    } else {
-                        buf.insert(pos + 1, Math.abs(hi));
-                    }
-                }
+                beforeCurrentEra(buf, inSec, printNanoInLocalDateTime ? inNano : 0);
             }
             // add fraction
-            if ((fractionalDigits < 0 && inNano > 0) || fractionalDigits > 0) {
-                buf.append('.');
-                int div = 100_000_000;
-                for (int i = 0; ((fractionalDigits == -1 && inNano > 0) ||
-                                    (fractionalDigits == -2 && (inNano > 0 || (i % 3) != 0)) ||
-                                    i < fractionalDigits); i++) {
-                    int digit = inNano / div;
-                    buf.append((char) (digit + '0'));
-                    inNano = inNano - (digit * div);
-                    div = div / 10;
-                }
+            if (!printNanoInLocalDateTime) {
+                printNano(buf, inSec, inNano);
             }
             buf.append('Z');
             return true;
+        }
+
+        private void printNano(StringBuilder buf, long inSec, int inNano) {
+            buf.append('.');
+            int div = 100_000_000;
+            int fractionalDigits = this.fractionalDigits;
+            for (int i = 0; ((fractionalDigits == -1 && inNano > 0) ||
+                    (fractionalDigits == -2 && (inNano > 0 || (i % 3) != 0)) ||
+                    i < fractionalDigits); i++) {
+                int digit = inNano / div;
+                buf.append((char) (digit + '0'));
+                inNano = inNano - (digit * div);
+                div = div / 10;
+            }
+        }
+
+        private static void currentEra(StringBuilder buf, long inSec, int inNano) {
+            long zeroSecs = inSec - SECONDS_PER_10000_YEARS + SECONDS_0000_TO_1970;
+            long hi = Math.floorDiv(zeroSecs, SECONDS_PER_10000_YEARS) + 1;
+            long lo = Math.floorMod(zeroSecs, SECONDS_PER_10000_YEARS);
+            LocalDateTime ldt = LocalDateTime.ofEpochSecond(lo - SECONDS_0000_TO_1970, inNano, ZoneOffset.UTC);
+            if (hi > 0) {
+                buf.append('+').append(hi);
+            }
+            DateTimeHelper.formatTo(buf, ldt);
+            if (ldt.getSecond() == 0 && inNano == 0) {
+                buf.append(":00");
+            }
+        }
+
+        private static void beforeCurrentEra(StringBuilder buf, long inSec, int inNano) {
+            long zeroSecs = inSec + SECONDS_0000_TO_1970;
+            long hi = zeroSecs / SECONDS_PER_10000_YEARS;
+            long lo = zeroSecs % SECONDS_PER_10000_YEARS;
+            LocalDateTime ldt = LocalDateTime.ofEpochSecond(lo - SECONDS_0000_TO_1970, inNano, ZoneOffset.UTC);
+            int pos = buf.length();
+            DateTimeHelper.formatTo(buf, ldt);
+            if (ldt.getSecond() == 0 && inNano == 0) {
+                buf.append(":00");
+            }
+            if (hi < 0) {
+                if (ldt.getYear() == -10_000) {
+                    buf.replace(pos, pos + 2, Long.toString(hi - 1));
+                } else if (lo == 0) {
+                    buf.insert(pos, hi);
+                } else {
+                    buf.insert(pos + 1, Math.abs(hi));
+                }
+            }
         }
 
         @Override
@@ -3873,7 +3896,8 @@ public final class DateTimeFormatterBuilder {
                     .appendValue(MINUTE_OF_HOUR, 2).appendLiteral(':')
                     .appendValue(SECOND_OF_MINUTE, 2)
                     .appendFraction(NANO_OF_SECOND, minDigits, maxDigits, true)
-                    .appendOffsetId()
+                    .parseLenient()
+                    .appendOffset("+HH", "Z")
                     .toFormatter().toPrinterParser(false);
             DateTimeParseContext newContext = context.copy();
             int pos = parser.parse(newContext, text, position);
