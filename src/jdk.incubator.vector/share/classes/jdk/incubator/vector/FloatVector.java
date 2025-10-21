@@ -2944,9 +2944,9 @@ public abstract class FloatVector extends AbstractVector<Float> {
         return VectorSupport.loadWithMap(
             vectorType, null, float.class, vsp.laneCount(),
             isp.vectorType(), isp.length(),
-            a, ARRAY_BASE, vix, null,
+            a, ARRAY_BASE, vix, null, 0,
             a, offset, indexMap, mapOffset, vsp,
-            (c, idx, iMap, idy, s, vm, num) ->
+            (c, idx, iMap, idy, s, vm, vlen, off) ->
             s.vOp(n -> c[idx + iMap[idy+n]]));
     }
 
@@ -3393,9 +3393,9 @@ public abstract class FloatVector extends AbstractVector<Float> {
         return VectorSupport.loadWithMap(
             vectorType, maskClass, float.class, vsp.laneCount(),
             isp.vectorType(), isp.length(),
-            a, ARRAY_BASE, vix, m,
+            a, ARRAY_BASE, vix, m, 0,
             a, offset, indexMap, mapOffset, vsp,
-            (c, idx, iMap, idy, s, vm, num) ->
+            (c, idx, iMap, idy, s, vm, vlen, off) ->
             s.vOp(vm, n -> c[idx + iMap[idy+n]]));
     }
 

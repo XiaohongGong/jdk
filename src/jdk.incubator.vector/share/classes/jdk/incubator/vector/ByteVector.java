@@ -3077,31 +3077,33 @@ public abstract class ByteVector extends AbstractVector<Byte> {
                            VectorSpecies<Byte> species,
                            VectorSpecies<Integer> lsp,
                            byte[] a, int offset,
-                           int[] indexMap, int mapOffset, M m) {
+                           int[] indexMap, int mapOffset, int origin, M m) {
         ByteSpecies vsp = (ByteSpecies) species;
         Class<? extends ByteVector> vectorType = vsp.vectorType();
 
+        int idxOffset = mapOffset + origin;
+
         // Check indices are within array bounds.
-        IntVector vix = IntVector.fromArray(lsp, indexMap, mapOffset).add(offset);
+        IntVector vix = IntVector.fromArray(lsp, indexMap, idxOffset).add(offset);
         VectorIntrinsics.checkIndex(vix, a.length);
 
         if (m == null) {
             return VectorSupport.loadWithMap(
                 vectorType, null, byte.class, vsp.laneCount(),
                 lsp.vectorType(), lsp.length(),
-                a, ARRAY_BASE, vix, null,
-                a, offset, indexMap, mapOffset, vsp,
-                (c, idx, iMap, idy, s, vm, num) ->
-                s.vOp(n -> n < num ? c[idx + iMap[idy+n]] : 0));
+                a, ARRAY_BASE, vix, null, origin,
+                a, offset, indexMap, idxOffset, vsp,
+                (c, idx, iMap, idy, s, vm, vlen, off) ->
+                s.vOp(n -> (n >= off && n < (off + vlen)) ? c[idx + iMap[idy + n - off]] : 0));
         }
 
         return VectorSupport.loadWithMap(
             vectorType, maskClass, byte.class, vsp.laneCount(),
             lsp.vectorType(), lsp.length(),
-            a, ARRAY_BASE, vix, m,
-            a, offset, indexMap, mapOffset, vsp,
-            (c, idx, iMap, idy, s, vm, num) ->
-            s.vOp(vm, n -> n < num ? c[idx + iMap[idy+n]] : 0));
+            a, ARRAY_BASE, vix, m, origin,
+            a, offset, indexMap, idxOffset, vsp,
+            (c, idx, iMap, idy, s, vm, vlen, off) ->
+            s.vOp(vm, n -> (n >= off && n < (off + vlen) ? c[idx + iMap[idy + n - off]] : 0)));
     }
 
     /**
@@ -3153,16 +3155,29 @@ public abstract class ByteVector extends AbstractVector<Byte> {
             lsp = isp;
         }
 
-        // The first time of gather-load.
-        ByteVector vec = loadWithMap(null, vsp, lsp, a, offset, indexMap, mapOffset, null);
-
         int vlen = vsp.length();
         int idx_vlen = lsp.length();
-        // The remaining times of gather-load. Result should be merged into vec.
-        for (int i = idx_vlen; i < vlen; i += idx_vlen) {
-            ByteVector vec1 = loadWithMap(null, vsp, lsp, a, offset, indexMap, mapOffset + i, null);
-            // Concatenate vec and vec1: vec = [vec, vec1]
-            vec = vec.or(vsp.broadcast(0).slice(vlen - i, vec1));
+        if (vlen > 4 * idx_vlen) {
+            // Return with scalar version directly.
+            return vsp.vOp(n -> a[offset + indexMap[mapOffset + n]]);
+        }
+
+        // The first time of gather-load.
+        ByteVector vec = loadWithMap(null, vsp, lsp, a, offset, indexMap, mapOffset, 0, null);
+
+        // The second time of gather-load.
+        if (vlen >= 2 * idx_vlen) {
+            ByteVector vec1 = loadWithMap(null, vsp, lsp, a, offset, indexMap, mapOffset, idx_vlen, null);
+            // Merge vec and vec1: vec = [vec, vec1]
+            vec = vec.or(vec1);
+        }
+
+        // The third and fourth time of gather-load.
+        if (vlen == 4 * idx_vlen) {
+            ByteVector vec2 = loadWithMap(null, vsp, lsp, a, offset, indexMap, mapOffset, 2 * idx_vlen, null);
+            ByteVector vec3 = loadWithMap(null, vsp, lsp, a, offset, indexMap, mapOffset, 3 * idx_vlen, null);
+            // Merge vec, vec2, and vec3: vec = [vec, vec2, vec3]
+            vec = vec.or(vec2).or(vec3);
         }
         return vec;
     }
@@ -3910,17 +3925,29 @@ public abstract class ByteVector extends AbstractVector<Byte> {
             lsp = isp;
         }
 
-        // The first time of gather-load.
-        ByteVector vec = loadWithMap(maskClass, vsp, lsp, a, offset, indexMap, mapOffset, m);
-
         int vlen = vsp.length();
         int idx_vlen = lsp.length();
-        // The remaining times of gather-load. Result should be merged into vec.
-        for (int i = idx_vlen; i < vlen; i += idx_vlen) {
-            M m1 = (M) m.slice(i);
-            ByteVector vec1 = loadWithMap(maskClass, vsp, lsp, a, offset, indexMap, mapOffset + i, m1);
-            // Concatenate vec and vec1: vec = [vec, vec1]
-            vec = vec.or(vsp.broadcast(0).slice(vlen - i, vec1));
+        if (vlen > 4 * idx_vlen) {
+            // Return with scalar version directly.
+            return vsp.vOp(m, n -> a[offset + indexMap[mapOffset + n]]);
+        }
+
+        // The first time of gather-load.
+        ByteVector vec = loadWithMap(maskClass, vsp, lsp, a, offset, indexMap, mapOffset, 0, m);
+
+        // The second time of gather-load.
+        if (vlen >= 2 * idx_vlen) {
+            ByteVector vec1 = loadWithMap(maskClass, vsp, lsp, a, offset, indexMap, mapOffset, idx_vlen, m);
+            // Merge vec and vec1: vec = [vec, vec1]
+            vec = vec.or(vec1);
+        }
+
+        // The third and fourth time of gather-load.
+        if (vlen == 4 * idx_vlen) {
+            ByteVector vec2 = loadWithMap(maskClass, vsp, lsp, a, offset, indexMap, mapOffset, 2 * idx_vlen, m);
+            ByteVector vec3 = loadWithMap(maskClass, vsp, lsp, a, offset, indexMap, mapOffset, 3 * idx_vlen, m);
+            // Merge vec, vec2, and vec3: vec = [vec, vec2, vec3]
+            vec = vec.or(vec2).or(vec3);
         }
         return vec;
     }

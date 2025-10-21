@@ -5252,3 +5252,39 @@ SELECT_FROM_TWO_VECTORS(10, 11)
 SELECT_FROM_TWO_VECTORS(12, 13)
 SELECT_FROM_TWO_VECTORS(17, 18)
 SELECT_FROM_TWO_VECTORS(23, 24)
+
+// ---------------------------- Vector slice --------------------------------
+
+instruct vector_slice(vReg dst, vReg src1, vReg src2, immI idx) %{
+  match(Set dst (VectorSlice (Binary src1 src2) idx));
+  format %{ "vector_slice $dst, $idx, $src1, $src2" %}
+  ins_encode %{
+    uint length_in_bytes = Matcher::vector_length_in_bytes(this);
+    if (VM_Version::use_neon_for_vector(length_in_bytes)) {
+      __ ext($dst$$FloatRegister, length_in_bytes == 16 ? __ T16B : __ T8B,
+             $src1$$FloatRegister, $src2$$FloatRegister, (int)($idx$$constant));
+    } else {
+      assert(UseSVE > 0, "must be");
+      __ sve_movprfx($dst$$FloatRegister, $src1$$FloatRegister);
+      __ sve_ext($dst$$FloatRegister, $src2$$FloatRegister, (int)($idx$$constant));
+    }
+  %}
+  ins_pipe(pipe_slow);
+%}
+
+instruct vector_mask_slice(pReg dst, pReg src1, pReg src2, immI idx, vReg tmp1, vReg tmp2) %{
+  match(Set dst (VectorSlice (Binary src1 src2) idx));
+  effect(TEMP tmp1, TEMP tmp2);
+  format %{ "vector_mask_slice $dst, $idx, $src1, $src2" %}
+  ins_encode %{
+    assert(UseSVE > 0, "must be");
+    __ sve_cpy($tmp1$$FloatRegister, get_reg_variant(this),
+               $src1$$PRegister, 1, false);
+    __ sve_cpy($tmp2$$FloatRegister, get_reg_variant(this),
+               $src2$$PRegister, 1, false);
+    __ sve_ext($tmp1$$FloatRegister, $tmp2$$FloatRegister, (int)($idx$$constant));
+    __ sve_cmp(Assembler::NE, $dst$$PRegister, get_reg_variant(this),
+               ptrue, $tmp1$$FloatRegister, 0);
+  %}
+  ins_pipe(pipe_slow);
+%}

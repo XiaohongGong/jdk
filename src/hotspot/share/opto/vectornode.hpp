@@ -1750,6 +1750,22 @@ class VectorTestNode : public CmpNode {
   }
 };
 
+//------------------------------VectorSliceNode--------------------------------
+// Vector slice node.
+class VectorSliceNode : public VectorNode {
+  public:
+    VectorSliceNode(Node* vec1, Node* vec2, Node* origin)
+      : VectorNode(vec1, vec2, origin, vec1->bottom_type()->is_vect()) {
+      assert(origin->is_Con(), "origin must be a constant");
+    }
+
+    virtual int Opcode() const;
+    Node* vec1() const { return in(1); }
+    Node* vec2() const { return in(2); }
+    Node* origin() const { return in(3); }
+    virtual Node* Identity(PhaseGVN* phase);
+};
+
 class VectorBlendNode : public VectorNode {
  public:
   VectorBlendNode(Node* vec1, Node* vec2, Node* mask)

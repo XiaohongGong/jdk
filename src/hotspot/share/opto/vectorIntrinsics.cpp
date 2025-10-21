@@ -1192,7 +1192,7 @@ bool LibraryCallKit::inline_vector_mem_masked_operation(bool is_store) {
 //   V loadWithMap(Class<? extends V> vClass, Class<M> mClass, Class<E> eClass, int length,
 //                 Class<? extends Vector<Integer>> vectorIndexClass, int indexLength,
 //                 Object base, long offset,
-//                 W indexVector, M m, C container,
+//                 W indexVector, M m, int origin, C container,
 //                 int index, int[] indexMap, int indexM, S s,
 //                 LoadVectorOperationWithMap<C, V, S, M> defaultImpl)
 //
@@ -1290,6 +1290,16 @@ bool LibraryCallKit::inline_vector_gather_scatter(bool is_scatter) {
                   is_scatter, is_scatter ? "scatter" : "gather",
                   idx_num_elem, is_masked_op ? 1 : 0);
     return false; // not supported
+  }
+
+  int origin = 0;
+  if (!is_scatter) {
+    const TypeInt* origin_type = gvn().type(argument(11))->isa_int();
+    if (origin_type == nullptr || !origin_type->is_con()) {
+      log_if_needed("  ** missing constant: origin=%s", NodeClassNames[argument(11)->Opcode()]);
+      return false; // not enough info for intrinsification
+    }
+    origin = origin_type->get_con();
   }
 
   Node* base = argument(6);
@@ -1392,6 +1402,13 @@ bool LibraryCallKit::inline_vector_gather_scatter(bool is_scatter) {
     BasicType load_elem_bt = load_vector_type->element_basic_type();
 
     if (mask != nullptr) {
+      // Cross-shift mask from the higher lanes to the lowest ones.
+      // The shift count is "origin".
+      if (origin != 0) {
+        Node* mask_zero = gvn().transform(VectorNode::scalar2vector(gvn().makecon(Type::get_zero_type(elem_bt)), num_elem, elem_bt, true));
+        Node* shift_count = gvn().makecon(TypeInt::make(origin * type2aelembytes(elem_bt)));
+        mask = gvn().transform(new VectorSliceNode(mask, mask_zero, shift_count));
+      }
       // Resize the mask to the target vector type.
       if (load_num_elem != num_elem) {
         const TypeVect* resize_type = TypeVect::makemask(elem_bt, load_num_elem);
@@ -1414,6 +1431,12 @@ bool LibraryCallKit::inline_vector_gather_scatter(bool is_scatter) {
     // Resize the load vector to the target vector length.
     if (load_num_elem != num_elem) {
       vload = gvn().transform(new VectorReinterpretNode(vload, vload->bottom_type()->is_vect(), vector_type));
+    }
+    // Cross-lane shift the load vector from lowest lanes to the origin lane.
+    if (origin != 0) {
+      Node* zero = gvn().transform(VectorNode::scalar2vector(gvn().makecon(Type::get_zero_type(elem_bt)), num_elem, elem_bt, false));
+      Node* shift_count = gvn().makecon(TypeInt::make(type2aelembytes(elem_bt) * (num_elem - origin)));
+      vload = gvn().transform(new VectorSliceNode(zero, vload, shift_count));
     }
 
     Node* box = box_vector(vload, vbox_type, elem_bt, num_elem);
