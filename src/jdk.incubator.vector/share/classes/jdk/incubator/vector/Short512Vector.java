@@ -691,13 +691,6 @@ final class Short512Vector extends ShortVector {
             return (Short512Vector) super.toVectorTemplate();  // specialize
         }
 
-        @ForceInline
-        @Override
-        public final
-        Short512Mask slice(int origin) {
-            return (Short512Mask) super.sliceTemplate(origin);
-        }
-
         /**
          * Helper function for lane-wise mask conversions.
          * This function kicks in after intrinsic failure.

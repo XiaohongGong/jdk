@@ -916,13 +916,6 @@ final class $vectortype$ extends $abstractvectortype$ {
             return ($vectortype$) super.toVectorTemplate();  // specialize
         }
 
-        @ForceInline
-        @Override
-        public final
-        $masktype$ slice(int origin) {
-            return ($masktype$) super.sliceTemplate(origin);
-        }
-
         /**
          * Helper function for lane-wise mask conversions.
          * This function kicks in after intrinsic failure.

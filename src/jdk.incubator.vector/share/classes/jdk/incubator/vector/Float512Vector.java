@@ -648,13 +648,6 @@ final class Float512Vector extends FloatVector {
             return (Float512Vector) super.toVectorTemplate();  // specialize
         }
 
-        @ForceInline
-        @Override
-        public final
-        Float512Mask slice(int origin) {
-            return (Float512Mask) super.sliceTemplate(origin);
-        }
-
         /**
          * Helper function for lane-wise mask conversions.
          * This function kicks in after intrinsic failure.

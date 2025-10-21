@@ -624,13 +624,6 @@ final class Float128Vector extends FloatVector {
             return (Float128Vector) super.toVectorTemplate();  // specialize
         }
 
-        @ForceInline
-        @Override
-        public final
-        Float128Mask slice(int origin) {
-            return (Float128Mask) super.sliceTemplate(origin);
-        }
-
         /**
          * Helper function for lane-wise mask conversions.
          * This function kicks in after intrinsic failure.

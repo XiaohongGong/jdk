@@ -617,13 +617,6 @@ final class FloatMaxVector extends FloatVector {
             return (FloatMaxVector) super.toVectorTemplate();  // specialize
         }
 
-        @ForceInline
-        @Override
-        public final
-        FloatMaxMask slice(int origin) {
-            return (FloatMaxMask) super.sliceTemplate(origin);
-        }
-
         /**
          * Helper function for lane-wise mask conversions.
          * This function kicks in after intrinsic failure.

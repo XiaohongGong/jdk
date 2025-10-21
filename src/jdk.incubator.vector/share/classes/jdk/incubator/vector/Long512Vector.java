@@ -633,13 +633,6 @@ final class Long512Vector extends LongVector {
             return (Long512Vector) super.toVectorTemplate();  // specialize
         }
 
-        @ForceInline
-        @Override
-        public final
-        Long512Mask slice(int origin) {
-            return (Long512Mask) super.sliceTemplate(origin);
-        }
-
         /**
          * Helper function for lane-wise mask conversions.
          * This function kicks in after intrinsic failure.

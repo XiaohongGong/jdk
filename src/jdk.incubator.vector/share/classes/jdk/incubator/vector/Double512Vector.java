@@ -632,13 +632,6 @@ final class Double512Vector extends DoubleVector {
             return (Double512Vector) super.toVectorTemplate();  // specialize
         }
 
-        @ForceInline
-        @Override
-        public final
-        Double512Mask slice(int origin) {
-            return (Double512Mask) super.sliceTemplate(origin);
-        }
-
         /**
          * Helper function for lane-wise mask conversions.
          * This function kicks in after intrinsic failure.

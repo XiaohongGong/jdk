@@ -617,13 +617,6 @@ final class DoubleMaxVector extends DoubleVector {
             return (DoubleMaxVector) super.toVectorTemplate();  // specialize
         }
 
-        @ForceInline
-        @Override
-        public final
-        DoubleMaxMask slice(int origin) {
-            return (DoubleMaxMask) super.sliceTemplate(origin);
-        }
-
         /**
          * Helper function for lane-wise mask conversions.
          * This function kicks in after intrinsic failure.

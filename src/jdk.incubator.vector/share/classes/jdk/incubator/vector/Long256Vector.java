@@ -625,13 +625,6 @@ final class Long256Vector extends LongVector {
             return (Long256Vector) super.toVectorTemplate();  // specialize
         }
 
-        @ForceInline
-        @Override
-        public final
-        Long256Mask slice(int origin) {
-            return (Long256Mask) super.sliceTemplate(origin);
-        }
-
         /**
          * Helper function for lane-wise mask conversions.
          * This function kicks in after intrinsic failure.

@@ -620,13 +620,6 @@ final class Double128Vector extends DoubleVector {
             return (Double128Vector) super.toVectorTemplate();  // specialize
         }
 
-        @ForceInline
-        @Override
-        public final
-        Double128Mask slice(int origin) {
-            return (Double128Mask) super.sliceTemplate(origin);
-        }
-
         /**
          * Helper function for lane-wise mask conversions.
          * This function kicks in after intrinsic failure.

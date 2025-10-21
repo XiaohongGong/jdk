@@ -643,13 +643,6 @@ final class Byte64Vector extends ByteVector {
             return (Byte64Vector) super.toVectorTemplate();  // specialize
         }
 
-        @ForceInline
-        @Override
-        public final
-        Byte64Mask slice(int origin) {
-            return (Byte64Mask) super.sliceTemplate(origin);
-        }
-
         /**
          * Helper function for lane-wise mask conversions.
          * This function kicks in after intrinsic failure.
