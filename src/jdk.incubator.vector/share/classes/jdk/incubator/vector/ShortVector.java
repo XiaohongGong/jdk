@@ -3073,36 +3073,36 @@ public abstract class ShortVector extends AbstractVector<Short> {
 
     @ForceInline
     private static
+    ShortVector loadWithMap(VectorSpecies<Short> species,
+                           VectorSpecies<Integer> lsp,
+                           IntVector vix, short[] a, int offset,
+                           int[] indexMap, int mapOffset, int origin) {
+        ShortSpecies vsp = (ShortSpecies) species;
+        Class<? extends ShortVector> vectorType = vsp.vectorType();
+        return VectorSupport.loadWithMap(
+            vectorType, null, short.class, vsp.laneCount(),
+            lsp.vectorType(), lsp.length(),
+            a, ARRAY_BASE, vix, null, origin,
+            a, offset, indexMap, mapOffset + origin, vsp,
+            (c, idx, iMap, idy, s, vm, vlen, off) ->
+            s.vOp(n -> (n >= off && n < (off + vlen)) ? c[idx + iMap[idy + n - off]] : 0));
+    }
+
+    @ForceInline
+    private static
     <M extends VectorMask<Short>>
     ShortVector loadWithMap(Class<M> maskClass,
                            VectorSpecies<Short> species,
                            VectorSpecies<Integer> lsp,
-                           short[] a, int offset,
+                           IntVector vix, short[] a, int offset,
                            int[] indexMap, int mapOffset, int origin, M m) {
         ShortSpecies vsp = (ShortSpecies) species;
         Class<? extends ShortVector> vectorType = vsp.vectorType();
-
-        int idxOffset = mapOffset + origin;
-
-        // Check indices are within array bounds.
-        IntVector vix = IntVector.fromArray(lsp, indexMap, idxOffset).add(offset);
-        VectorIntrinsics.checkIndex(vix, a.length);
-
-        if (m == null) {
-            return VectorSupport.loadWithMap(
-                vectorType, null, short.class, vsp.laneCount(),
-                lsp.vectorType(), lsp.length(),
-                a, ARRAY_BASE, vix, null, origin,
-                a, offset, indexMap, idxOffset, vsp,
-                (c, idx, iMap, idy, s, vm, vlen, off) ->
-                s.vOp(n -> (n >= off && n < (off + vlen)) ? c[idx + iMap[idy + n - off]] : 0));
-        }
-
         return VectorSupport.loadWithMap(
             vectorType, maskClass, short.class, vsp.laneCount(),
             lsp.vectorType(), lsp.length(),
             a, ARRAY_BASE, vix, m, origin,
-            a, offset, indexMap, idxOffset, vsp,
+            a, offset, indexMap, mapOffset + origin, vsp,
             (c, idx, iMap, idy, s, vm, vlen, off) ->
             s.vOp(vm, n -> (n >= off && n < (off + vlen) ? c[idx + iMap[idy + n - off]] : 0)));
     }
@@ -3163,12 +3163,23 @@ public abstract class ShortVector extends AbstractVector<Short> {
             return vsp.vOp(n -> a[offset + indexMap[mapOffset + n]]);
         }
 
+        // Check indices are within array bounds.
+        IntVector vix0 = IntVector.fromArray(lsp, indexMap, mapOffset).add(offset);
+        VectorIntrinsics.checkIndex(vix0, a.length);
+
+        IntVector vix1 = null;
+        if (vlen >= 2 * idx_vlen) {
+            vix1 = IntVector.fromArray(lsp, indexMap, mapOffset + idx_vlen).add(offset);
+            VectorIntrinsics.checkIndex(vix1, a.length);
+        }
+
+
         // The first time of gather-load.
-        ShortVector vec = loadWithMap(null, vsp, lsp, a, offset, indexMap, mapOffset, 0, null);
+        ShortVector vec = loadWithMap(vsp, lsp, vix0, a, offset, indexMap, mapOffset, 0);
 
         // The second time of gather-load.
-        if (vlen == 2 * idx_vlen) {
-            ShortVector vec1 = loadWithMap(null, vsp, lsp, a, offset, indexMap, mapOffset, idx_vlen, null);
+        if (vix1 != null) {
+            ShortVector vec1 = loadWithMap(vsp, lsp, vix1, a, offset, indexMap, mapOffset, idx_vlen);
             // Merge vec and vec1: vec = [vec, vec1]
             vec = vec.or(vec1);
         }
@@ -3910,12 +3921,24 @@ public abstract class ShortVector extends AbstractVector<Short> {
             return vsp.vOp(m, n -> a[offset + indexMap[mapOffset + n]]);
         }
 
+        // Check indices are within array bounds.
+        // FIXME: Check index under mask controlling.
+        IntVector vix0 = IntVector.fromArray(lsp, indexMap, mapOffset).add(offset);
+        VectorIntrinsics.checkIndex(vix0, a.length);
+
+        IntVector vix1 = null;
+        if (vlen >= 2 * idx_vlen) {
+            vix1 = IntVector.fromArray(lsp, indexMap, mapOffset + idx_vlen).add(offset);
+            VectorIntrinsics.checkIndex(vix1, a.length);
+        }
+
+
         // The first time of gather-load.
-        ShortVector vec = loadWithMap(maskClass, vsp, lsp, a, offset, indexMap, mapOffset, 0, m);
+        ShortVector vec = loadWithMap(maskClass, vsp, lsp, vix0, a, offset, indexMap, mapOffset, 0, m);
 
         // The second time of gather-load.
-        if (vlen == 2 * idx_vlen) {
-            ShortVector vec1 = loadWithMap(maskClass, vsp, lsp, a, offset, indexMap, mapOffset, idx_vlen, m);
+        if (vix1 != null) {
+            ShortVector vec1 = loadWithMap(maskClass, vsp, lsp, vix1, a, offset, indexMap, mapOffset, idx_vlen, m);
             // Merge vec and vec1: vec = [vec, vec1]
             vec = vec.or(vec1);
         }
