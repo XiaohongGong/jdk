@@ -2711,6 +2711,15 @@ BasicType Matcher::vector_element_basic_type(const MachNode* use, const MachOper
   return def->bottom_type()->is_vect()->element_basic_type();
 }
 
+int Matcher::get_input_index(const Node* n, int opcode) {
+  for (uint i = 1; i < n->req(); i++) {
+    if (n->in(i)->Opcode() == opcode) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 bool Matcher::is_non_long_integral_vector(const Node* n) {
   BasicType bt = vector_element_basic_type(n);
   assert(bt != T_CHAR, "char is not allowed in vector");

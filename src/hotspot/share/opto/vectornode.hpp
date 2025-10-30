@@ -1848,7 +1848,12 @@ class VectorMaskCastNode : public VectorNode {
     assert(in_vt->length() == vt->length(), "vector length must match");
   }
   Node* Identity(PhaseGVN* phase);
+  Node* Ideal(PhaseGVN* phase, bool can_reshape);
   virtual int Opcode() const;
+
+ private:
+  Node* decompose_vector_mask_cast(PhaseGVN* phase);
+  Node* optimize_mask_cast_slice_pattern(PhaseGVN* phase);
 };
 
 // This is intended for use as a simple reinterpret node that has no cast.

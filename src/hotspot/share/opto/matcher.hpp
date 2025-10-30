@@ -368,6 +368,10 @@ public:
   static BasicType vector_element_basic_type(const Node* n);
   static BasicType vector_element_basic_type(const MachNode* use, const MachOper* opnd);
 
+  // Get the index of the input node with the given opcode.
+  // Returns -1 if no such input node is found.
+  static int get_input_index(const Node* n, int opcode);
+
   // Vector element basic type is non double word integral type.
   static bool is_non_long_integral_vector(const Node* n);
 
