@@ -1082,7 +1082,8 @@ Node* VectorNode::try_to_gen_masked_vector(PhaseGVN* gvn, Node* node, const Type
   case Op_LoadVectorGather:
     return new LoadVectorGatherMaskedNode(node->in(0), node->in(1), node->in(2),
                                           node->as_LoadVector()->adr_type(), vt,
-                                          node->in(3), mask);
+                                          node->in(3), mask,
+                                          node->as_LoadVectorGather()->mem_bt());
   case Op_StoreVector:
     return new StoreVectorMaskedNode(node->in(0), node->in(1), node->in(2), node->in(3),
                                      node->as_StoreVector()->adr_type(), mask);
@@ -1981,6 +1982,142 @@ Node* VectorMaskCastNode::Identity(PhaseGVN* phase) {
   return this;
 }
 
+// Check if a node matches the double-size mask widening pattern:
+// VectorMaskCast(VectorReinterpret(input))
+// where the element type doubles in size and the vector length is halved,
+// while maintaining the same total byte size.
+// For example: <16 x i8> -> <8 x i16> (both are 16 bytes).
+static bool is_double_size_mask_widening_pattern(Node* n) {
+  if (n->Opcode() != Op_VectorMaskCast ||
+      n->in(1)->Opcode() != Op_VectorReinterpret) {
+    return false;
+  }
+  const TypeVect* src_vt = n->in(1)->in(1)->bottom_type()->is_vect();
+  const TypeVect* dst_vt = n->bottom_type()->is_vect();
+  return type2aelembytes(dst_vt->element_basic_type()) == 2 * type2aelembytes(src_vt->element_basic_type()) &&
+         dst_vt->length() * 2 == src_vt->length() &&
+         dst_vt->length_in_bytes() == src_vt->length_in_bytes();
+}
+
+static BasicType get_double_size_element_type(BasicType bt) {
+  switch (bt) {
+    case T_BYTE: return T_SHORT;
+    case T_SHORT: return T_INT;
+    case T_INT: return T_LONG;
+    default:
+      assert(false, "unsupported");
+      return T_ILLEGAL;
+  }
+}
+
+// Widen a vector mask by doubling element size and halving length.
+// Creates the pattern: VectorMaskCast(VectorReinterpret(input))
+// For example: <16 x i8> -> <8 x i16>
+// This preserves the mask bits while reorganizing them into larger elements.
+static Node* widen_mask_to_double_size(PhaseGVN* phase, Node* n) {
+  const TypeVect* src_vt = n->bottom_type()->is_vect();
+  const TypeVect* tmp_vt = TypeVect::makemask(src_vt->element_basic_type(), src_vt->length() / 2);
+  const TypeVect* dst_vt = TypeVect::makemask(get_double_size_element_type(src_vt->element_basic_type()), src_vt->length() / 2);
+  Node* value = phase->transform(new VectorReinterpretNode(n, src_vt, tmp_vt));
+  return new VectorMaskCastNode(value, dst_vt);
+}
+
+// Split vector mask cast into two steps when element size increases by 4x or more.
+// This creates intermediate widening operations that are easier to match and optimize.
+Node* VectorMaskCastNode::decompose_vector_mask_cast(PhaseGVN* phase) {
+  Node* in = this->in(1);
+  if (in->Opcode() == Op_VectorReinterpret) {
+    in = in->in(1);
+  }
+
+  const TypeVect* src_vt = in->bottom_type()->is_vect();
+  const TypeVect* dst_vt = vect_type();
+  BasicType src_bt = src_vt->element_basic_type();
+  BasicType dst_bt = dst_vt->element_basic_type();
+  int src_vlen = src_vt->length();
+  int dst_vlen = dst_vt->length();
+  if (!(type2aelembytes(dst_bt) >= 4 * type2aelembytes(src_bt) ||
+        type2aelembytes(src_bt) >= 4 * type2aelembytes(dst_bt))) {
+    return this;
+  }
+
+  // Split vector mask widening into two steps.
+  if (src_vt->length_in_bytes() == dst_vt->length_in_bytes() &&
+      src_vlen >= 4 * dst_vlen) {
+    Node* n = phase->transform(widen_mask_to_double_size(phase, in));
+    return widen_mask_to_double_size(phase, n);
+  }
+
+  // TODO: Split vector mask narrowing into two steps.
+  return this;
+}
+
+// Optimize patterns where a mask cast is applied after a VectorSlice operation.
+// When the cast increases element size by 4x, this method restructures the pattern
+// by sandwiching the slice between mask widening operations. This creates a form
+// that is easier to match against backend instruction patterns in subsequent passes.
+Node* VectorMaskCastNode::optimize_mask_cast_slice_pattern(PhaseGVN* phase) {
+  Node* n = this;
+
+  // Uncast the node until we get a VectorSlice input.
+  while (is_double_size_mask_widening_pattern(n)) {
+    n = n->in(1)->in(1);
+  }
+  if (n->Opcode() != Op_VectorSlice ||
+      !VectorNode::is_all_zeros_vector(n->in(2))) {
+    return this;
+  }
+
+  const TypeVect* dst_vt = vect_type();
+  const TypeVect* src_vt = n->bottom_type()->is_vect();
+  int src_vlen = src_vt->length();
+
+  // Do the transformation.
+  if (type2aelembytes(dst_vt->element_basic_type()) == 4 * type2aelembytes(src_vt->element_basic_type())) {
+    Node* value = n->in(1);
+    Node* origin = n->in(3)->as_ConI();
+    int shift_count = origin->get_int() / type2aelembytes(src_vt->element_basic_type());
+
+    // Split VectorSlice into two steps when extracting the highest quarter (elements at 3/4 to end):
+    // first extract the upper half, then extract the upper half of that result.
+    if (shift_count == (src_vlen / 4) * 3) {
+      origin = phase->makecon(TypeInt::make(type2aelembytes(src_vt->element_basic_type()) * (src_vlen / 2)));
+      value = phase->transform(new VectorSliceNode(value, n->in(2), origin));
+      shift_count -= src_vlen / 2;
+    }
+
+    // Sandwich VectorSlice between two double-size mask extensions to create a pattern that's easier to match
+    // in subsequent optimizations.
+    if (shift_count == src_vlen / 4) {
+      value = phase->transform(widen_mask_to_double_size(phase, value));
+      const TypeVect* tmp_vt = value->bottom_type()->is_vect();
+      Node* zero = phase->transform(phase->zerocon(tmp_vt->element_basic_type()));
+      zero = phase->transform(VectorNode::scalar2vector(zero, tmp_vt->length(), tmp_vt->element_basic_type(), true));
+      origin = phase->makecon(TypeInt::make(type2aelembytes(tmp_vt->element_basic_type()) * shift_count));
+      Node* slice = phase->transform(new VectorSliceNode(value, zero, origin));
+      return widen_mask_to_double_size(phase, slice);
+    }
+  }
+  return this;
+}
+
+Node* VectorMaskCastNode::Ideal(PhaseGVN* phase, bool can_reshape) {
+  // Try to split large mask casts (4x+ element size increase) into smaller steps
+  // for better matching and optimization opportunities.
+  Node* n = decompose_vector_mask_cast(phase);
+  if (n != this) {
+    return n;
+  }
+
+  // Try to reorder mask cast and slice operations to create recognizable patterns
+  // that can be more efficiently matched in subsequent optimization passes.
+  n = optimize_mask_cast_slice_pattern(phase);
+  if (n != this) {
+    return n;
+  }
+  return VectorNode::Ideal(phase, can_reshape);
+}
+
 // This function does the following optimization:
 //   VectorMaskToLong(MaskAll(l)) => (l & (-1ULL >> (64 - vlen)))
 //   VectorMaskToLong(VectorStoreMask(Replicate(l))) => (l & (-1ULL >> (64 - vlen)))
@@ -2505,6 +2642,19 @@ Node* UMaxVNode::Identity(PhaseGVN* phase) {
   }
   return this;
 }
+
+Node* VectorSliceNode::Identity(PhaseGVN* phase) {
+  jint index = origin()->get_int();
+  uint vlen = vect_type()->length_in_bytes();
+  if (vlen == (uint)index) {
+    return vec2();
+  }
+  if (index == 0) {
+    return vec1();
+  }
+  return this;
+}
+
 #ifndef PRODUCT
 void VectorBoxAllocateNode::dump_spec(outputStream *st) const {
   CallStaticJavaNode::dump_spec(st);

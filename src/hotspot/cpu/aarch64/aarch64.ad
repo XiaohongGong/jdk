@@ -2683,12 +2683,21 @@ static bool is_vector_bitwise_not_pattern(Node* n, Node* m) {
   return false;
 }
 
+static bool is_slice_with_zero(Node* n, Node* m) {
+  if (n != nullptr && m != nullptr) {
+    return (n->Opcode() == Op_VectorSlice) &&
+           VectorNode::is_all_zeros_vector(m);
+  }
+  return false;
+}
+
 // Should the matcher clone input 'm' of node 'n'?
 bool Matcher::pd_clone_node(Node* n, Node* m, Matcher::MStack& mstack) {
   if (is_vshift_con_pattern(n, m) ||
       is_vector_bitwise_not_pattern(n, m) ||
       is_valid_sve_arith_imm_pattern(n, m) ||
-      is_encode_and_store_pattern(n, m)) {
+      is_encode_and_store_pattern(n, m) ||
+      is_slice_with_zero(n, m)) {
     mstack.push(m, Visit);
     return true;
   }
@@ -2700,18 +2709,26 @@ bool Matcher::pd_clone_node(Node* n, Node* m, Matcher::MStack& mstack) {
 // into registers?
 bool Matcher::pd_clone_address_expressions(AddPNode* m, Matcher::MStack& mstack, VectorSet& address_visited) {
 
-  // Loads and stores with indirect memory input (e.g., volatile loads and
-  // stores) do not subsume the input into complex addressing expressions. If
-  // the addressing expression is input to at least one such load or store, do
-  // not clone the addressing expression. Query needs_acquiring_load and
-  // needs_releasing_store as a proxy for indirect memory input, as it is not
-  // possible to directly query for indirect memory input at this stage.
+  // Loads and stores with indirect memory input (e.g., volatile loads/stores,
+  // and vector gather_loads/scatter_stores) do not subsume the input into
+  // complex addressing expressions. If the addressing expression is input
+  // to at least one such load or store, do not clone the addressing expression.
+  // Query needs_acquiring_load and needs_releasing_store as a proxy for
+  // indirect memory input, as it is not possible to directly query for indirect
+  // memory input at this stage.
   for (DUIterator_Fast imax, i = m->fast_outs(imax); i < imax; i++) {
     Node* n = m->fast_out(i);
     if (n->is_Load() && needs_acquiring_load(n)) {
       return false;
     }
     if (n->is_Store() && needs_releasing_store(n)) {
+      return false;
+    }
+
+    if (n->is_LoadVectorGather() ||
+        n->is_StoreVectorScatter() ||
+        n->is_LoadVectorGatherMasked() ||
+        n->is_StoreVectorScatterMasked()) {
       return false;
     }
   }

@@ -3071,6 +3071,42 @@ public abstract class ShortVector extends AbstractVector<Short> {
         return vsp.dummyVector().fromArray0(a, offset, m, OFFSET_OUT_OF_RANGE);
     }
 
+    @ForceInline
+    private static
+    ShortVector loadWithMap(VectorSpecies<Short> species,
+                           VectorSpecies<Integer> lsp,
+                           IntVector vix, short[] a, int offset,
+                           int[] indexMap, int mapOffset, int origin) {
+        ShortSpecies vsp = (ShortSpecies) species;
+        Class<? extends ShortVector> vectorType = vsp.vectorType();
+        return VectorSupport.loadWithMap(
+            vectorType, null, short.class, vsp.laneCount(),
+            lsp.vectorType(), lsp.length(),
+            a, ARRAY_BASE, vix, null, origin,
+            a, offset, indexMap, mapOffset + origin, vsp,
+            (c, idx, iMap, idy, s, vm, vlen, off) ->
+            s.vOp(n -> (n >= off && n < (off + vlen)) ? c[idx + iMap[idy + n - off]] : 0));
+    }
+
+    @ForceInline
+    private static
+    <M extends VectorMask<Short>>
+    ShortVector loadWithMap(Class<M> maskClass,
+                           VectorSpecies<Short> species,
+                           VectorSpecies<Integer> lsp,
+                           IntVector vix, short[] a, int offset,
+                           int[] indexMap, int mapOffset, int origin, M m) {
+        ShortSpecies vsp = (ShortSpecies) species;
+        Class<? extends ShortVector> vectorType = vsp.vectorType();
+        return VectorSupport.loadWithMap(
+            vectorType, maskClass, short.class, vsp.laneCount(),
+            lsp.vectorType(), lsp.length(),
+            a, ARRAY_BASE, vix, m, origin,
+            a, offset, indexMap, mapOffset + origin, vsp,
+            (c, idx, iMap, idy, s, vm, vlen, off) ->
+            s.vOp(vm, n -> (n >= off && n < (off + vlen) ? c[idx + iMap[idy + n - off]] : 0)));
+    }
+
     /**
      * Gathers a new vector composed of elements from an array of type
      * {@code short[]},
@@ -3111,8 +3147,6 @@ public abstract class ShortVector extends AbstractVector<Short> {
         IntVector.IntSpecies isp = IntVector.species(vsp.indexShape());
         Objects.requireNonNull(a);
         Objects.requireNonNull(indexMap);
-        Class<? extends ShortVector> vectorType = vsp.vectorType();
-
 
         // Constant folding should sweep out following conditonal logic.
         VectorSpecies<Integer> lsp;
@@ -3122,25 +3156,34 @@ public abstract class ShortVector extends AbstractVector<Short> {
             lsp = isp;
         }
 
+        int vlen = vsp.length();
+        int idx_vlen = lsp.length();
+        if (vlen > 2 * idx_vlen) {
+            // Return with scalar version directly.
+            return vsp.vOp(n -> a[offset + indexMap[mapOffset + n]]);
+        }
+
         // Check indices are within array bounds.
         IntVector vix0 = IntVector.fromArray(lsp, indexMap, mapOffset).add(offset);
         VectorIntrinsics.checkIndex(vix0, a.length);
 
-        int vlen = vsp.length();
-        int idx_vlen = lsp.length();
         IntVector vix1 = null;
-        if (vlen >= idx_vlen * 2) {
+        if (vlen >= 2 * idx_vlen) {
             vix1 = IntVector.fromArray(lsp, indexMap, mapOffset + idx_vlen).add(offset);
             VectorIntrinsics.checkIndex(vix1, a.length);
         }
 
-        return VectorSupport.loadWithMap(
-            vectorType, null, short.class, vsp.laneCount(),
-            lsp.vectorType(), lsp.length(),
-            a, ARRAY_BASE, vix0, vix1, null, null, null,
-            a, offset, indexMap, mapOffset, vsp,
-            (c, idx, iMap, idy, s, vm) ->
-            s.vOp(n -> c[idx + iMap[idy+n]]));
+
+        // The first time of gather-load.
+        ShortVector vec = loadWithMap(vsp, lsp, vix0, a, offset, indexMap, mapOffset, 0);
+
+        // The second time of gather-load.
+        if (vix1 != null) {
+            ShortVector vec1 = loadWithMap(vsp, lsp, vix1, a, offset, indexMap, mapOffset, idx_vlen);
+            // Merge vec and vec1: vec = [vec, vec1]
+            vec = vec.or(vec1);
+        }
+        return vec;
     }
 
     /**
@@ -3852,6 +3895,7 @@ public abstract class ShortVector extends AbstractVector<Short> {
                                     int[] indexMap, int mapOffset,
                                     VectorMask<Short> m);
     @ForceInline
+    @SuppressWarnings("unchecked")
     final
     <M extends VectorMask<Short>>
     ShortVector fromArray0Template(Class<M> maskClass, short[] a, int offset,
@@ -3861,8 +3905,6 @@ public abstract class ShortVector extends AbstractVector<Short> {
         Objects.requireNonNull(a);
         Objects.requireNonNull(indexMap);
         m.check(vsp);
-        Class<? extends ShortVector> vectorType = vsp.vectorType();
-
 
         // Constant folding should sweep out following conditonal logic.
         VectorSpecies<Integer> lsp;
@@ -3872,26 +3914,35 @@ public abstract class ShortVector extends AbstractVector<Short> {
             lsp = isp;
         }
 
+        int vlen = vsp.length();
+        int idx_vlen = lsp.length();
+        if (vlen > 2 * idx_vlen) {
+            // Return with scalar version directly.
+            return vsp.vOp(m, n -> a[offset + indexMap[mapOffset + n]]);
+        }
+
         // Check indices are within array bounds.
         // FIXME: Check index under mask controlling.
         IntVector vix0 = IntVector.fromArray(lsp, indexMap, mapOffset).add(offset);
         VectorIntrinsics.checkIndex(vix0, a.length);
 
-        int vlen = vsp.length();
-        int idx_vlen = lsp.length();
         IntVector vix1 = null;
-        if (vlen >= idx_vlen * 2) {
+        if (vlen >= 2 * idx_vlen) {
             vix1 = IntVector.fromArray(lsp, indexMap, mapOffset + idx_vlen).add(offset);
             VectorIntrinsics.checkIndex(vix1, a.length);
         }
 
-        return VectorSupport.loadWithMap(
-            vectorType, maskClass, short.class, vsp.laneCount(),
-            lsp.vectorType(), lsp.length(),
-            a, ARRAY_BASE, vix0, vix1, null, null, m,
-            a, offset, indexMap, mapOffset, vsp,
-            (c, idx, iMap, idy, s, vm) ->
-            s.vOp(vm, n -> c[idx + iMap[idy+n]]));
+
+        // The first time of gather-load.
+        ShortVector vec = loadWithMap(maskClass, vsp, lsp, vix0, a, offset, indexMap, mapOffset, 0, m);
+
+        // The second time of gather-load.
+        if (vix1 != null) {
+            ShortVector vec1 = loadWithMap(maskClass, vsp, lsp, vix1, a, offset, indexMap, mapOffset, idx_vlen, m);
+            // Merge vec and vec1: vec = [vec, vec1]
+            vec = vec.or(vec1);
+        }
+        return vec;
     }
 
     /*package-private*/

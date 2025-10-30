@@ -3070,6 +3070,42 @@ public abstract class ByteVector extends AbstractVector<Byte> {
         return vsp.dummyVector().fromArray0(a, offset, m, OFFSET_OUT_OF_RANGE);
     }
 
+    @ForceInline
+    private static
+    ByteVector loadWithMap(VectorSpecies<Byte> species,
+                           VectorSpecies<Integer> lsp,
+                           IntVector vix, byte[] a, int offset,
+                           int[] indexMap, int mapOffset, int origin) {
+        ByteSpecies vsp = (ByteSpecies) species;
+        Class<? extends ByteVector> vectorType = vsp.vectorType();
+        return VectorSupport.loadWithMap(
+            vectorType, null, byte.class, vsp.laneCount(),
+            lsp.vectorType(), lsp.length(),
+            a, ARRAY_BASE, vix, null, origin,
+            a, offset, indexMap, mapOffset + origin, vsp,
+            (c, idx, iMap, idy, s, vm, vlen, off) ->
+            s.vOp(n -> (n >= off && n < (off + vlen)) ? c[idx + iMap[idy + n - off]] : 0));
+    }
+
+    @ForceInline
+    private static
+    <M extends VectorMask<Byte>>
+    ByteVector loadWithMap(Class<M> maskClass,
+                           VectorSpecies<Byte> species,
+                           VectorSpecies<Integer> lsp,
+                           IntVector vix, byte[] a, int offset,
+                           int[] indexMap, int mapOffset, int origin, M m) {
+        ByteSpecies vsp = (ByteSpecies) species;
+        Class<? extends ByteVector> vectorType = vsp.vectorType();
+        return VectorSupport.loadWithMap(
+            vectorType, maskClass, byte.class, vsp.laneCount(),
+            lsp.vectorType(), lsp.length(),
+            a, ARRAY_BASE, vix, m, origin,
+            a, offset, indexMap, mapOffset + origin, vsp,
+            (c, idx, iMap, idy, s, vm, vlen, off) ->
+            s.vOp(vm, n -> (n >= off && n < (off + vlen) ? c[idx + iMap[idy + n - off]] : 0)));
+    }
+
     /**
      * Gathers a new vector composed of elements from an array of type
      * {@code byte[]},
@@ -3110,8 +3146,6 @@ public abstract class ByteVector extends AbstractVector<Byte> {
         IntVector.IntSpecies isp = IntVector.species(vsp.indexShape());
         Objects.requireNonNull(a);
         Objects.requireNonNull(indexMap);
-        Class<? extends ByteVector> vectorType = vsp.vectorType();
-
 
         // Constant folding should sweep out following conditonal logic.
         VectorSpecies<Integer> lsp;
@@ -3121,34 +3155,50 @@ public abstract class ByteVector extends AbstractVector<Byte> {
             lsp = isp;
         }
 
+        int vlen = vsp.length();
+        int idx_vlen = lsp.length();
+        if (vlen > 4 * idx_vlen) {
+            // Return with scalar version directly.
+            return vsp.vOp(n -> a[offset + indexMap[mapOffset + n]]);
+        }
+
         // Check indices are within array bounds.
         IntVector vix0 = IntVector.fromArray(lsp, indexMap, mapOffset).add(offset);
         VectorIntrinsics.checkIndex(vix0, a.length);
 
-        int vlen = vsp.length();
-        int idx_vlen = lsp.length();
         IntVector vix1 = null;
-        if (vlen >= idx_vlen * 2) {
+        if (vlen >= 2 * idx_vlen) {
             vix1 = IntVector.fromArray(lsp, indexMap, mapOffset + idx_vlen).add(offset);
             VectorIntrinsics.checkIndex(vix1, a.length);
         }
 
         IntVector vix2 = null;
         IntVector vix3 = null;
-        if (vlen == idx_vlen * 4) {
+        if (vlen == 4 * idx_vlen) {
             vix2 = IntVector.fromArray(lsp, indexMap, mapOffset + idx_vlen * 2).add(offset);
             VectorIntrinsics.checkIndex(vix2, a.length);
             vix3 = IntVector.fromArray(lsp, indexMap, mapOffset + idx_vlen * 3).add(offset);
             VectorIntrinsics.checkIndex(vix3, a.length);
         }
 
-        return VectorSupport.loadWithMap(
-            vectorType, null, byte.class, vsp.laneCount(),
-            lsp.vectorType(), lsp.length(),
-            a, ARRAY_BASE, vix0, vix1, vix2, vix3, null,
-            a, offset, indexMap, mapOffset, vsp,
-            (c, idx, iMap, idy, s, vm) ->
-            s.vOp(n -> c[idx + iMap[idy+n]]));
+        // The first time of gather-load.
+        ByteVector vec = loadWithMap(vsp, lsp, vix0, a, offset, indexMap, mapOffset, 0);
+
+        // The second time of gather-load.
+        if (vix1 != null) {
+            ByteVector vec1 = loadWithMap(vsp, lsp, vix1, a, offset, indexMap, mapOffset, idx_vlen);
+            // Merge vec and vec1: vec = [vec, vec1]
+            vec = vec.or(vec1);
+        }
+
+        // The third and fourth time of gather-load.
+        if (vlen == 4 * idx_vlen) {
+            ByteVector vec2 = loadWithMap(vsp, lsp, vix2, a, offset, indexMap, mapOffset, 2 * idx_vlen);
+            ByteVector vec3 = loadWithMap(vsp, lsp, vix3, a, offset, indexMap, mapOffset, 3 * idx_vlen);
+            // Merge vec, vec2, and vec3: vec = [vec, vec2, vec3]
+            vec = vec.or(vec2.or(vec3));
+        }
+        return vec;
     }
 
     /**
@@ -3875,6 +3925,7 @@ public abstract class ByteVector extends AbstractVector<Byte> {
                                     int[] indexMap, int mapOffset,
                                     VectorMask<Byte> m);
     @ForceInline
+    @SuppressWarnings("unchecked")
     final
     <M extends VectorMask<Byte>>
     ByteVector fromArray0Template(Class<M> maskClass, byte[] a, int offset,
@@ -3884,8 +3935,6 @@ public abstract class ByteVector extends AbstractVector<Byte> {
         Objects.requireNonNull(a);
         Objects.requireNonNull(indexMap);
         m.check(vsp);
-        Class<? extends ByteVector> vectorType = vsp.vectorType();
-
 
         // Constant folding should sweep out following conditonal logic.
         VectorSpecies<Integer> lsp;
@@ -3895,35 +3944,51 @@ public abstract class ByteVector extends AbstractVector<Byte> {
             lsp = isp;
         }
 
+        int vlen = vsp.length();
+        int idx_vlen = lsp.length();
+        if (vlen > 4 * idx_vlen) {
+            // Return with scalar version directly.
+            return vsp.vOp(m, n -> a[offset + indexMap[mapOffset + n]]);
+        }
+
         // Check indices are within array bounds.
         // FIXME: Check index under mask controlling.
         IntVector vix0 = IntVector.fromArray(lsp, indexMap, mapOffset).add(offset);
         VectorIntrinsics.checkIndex(vix0, a.length);
 
-        int vlen = vsp.length();
-        int idx_vlen = lsp.length();
         IntVector vix1 = null;
-        if (vlen >= idx_vlen * 2) {
+        if (vlen >= 2 * idx_vlen) {
             vix1 = IntVector.fromArray(lsp, indexMap, mapOffset + idx_vlen).add(offset);
             VectorIntrinsics.checkIndex(vix1, a.length);
         }
 
         IntVector vix2 = null;
         IntVector vix3 = null;
-        if (vlen == idx_vlen * 4) {
+        if (vlen == 4 * idx_vlen) {
             vix2 = IntVector.fromArray(lsp, indexMap, mapOffset + idx_vlen * 2).add(offset);
             VectorIntrinsics.checkIndex(vix2, a.length);
             vix3 = IntVector.fromArray(lsp, indexMap, mapOffset + idx_vlen * 3).add(offset);
             VectorIntrinsics.checkIndex(vix3, a.length);
         }
 
-        return VectorSupport.loadWithMap(
-            vectorType, maskClass, byte.class, vsp.laneCount(),
-            lsp.vectorType(), lsp.length(),
-            a, ARRAY_BASE, vix0, vix1, vix2, vix3, m,
-            a, offset, indexMap, mapOffset, vsp,
-            (c, idx, iMap, idy, s, vm) ->
-            s.vOp(vm, n -> c[idx + iMap[idy+n]]));
+        // The first time of gather-load.
+        ByteVector vec = loadWithMap(maskClass, vsp, lsp, vix0, a, offset, indexMap, mapOffset, 0, m);
+
+        // The second time of gather-load.
+        if (vix1 != null) {
+            ByteVector vec1 = loadWithMap(maskClass, vsp, lsp, vix1, a, offset, indexMap, mapOffset, idx_vlen, m);
+            // Merge vec and vec1: vec = [vec, vec1]
+            vec = vec.or(vec1);
+        }
+
+        // The third and fourth time of gather-load.
+        if (vlen == 4 * idx_vlen) {
+            ByteVector vec2 = loadWithMap(maskClass, vsp, lsp, vix2, a, offset, indexMap, mapOffset, 2 * idx_vlen, m);
+            ByteVector vec3 = loadWithMap(maskClass, vsp, lsp, vix3, a, offset, indexMap, mapOffset, 3 * idx_vlen, m);
+            // Merge vec, vec2, and vec3: vec = [vec, vec2, vec3]
+            vec = vec.or(vec2.or(vec3));
+        }
+        return vec;
     }
 
 

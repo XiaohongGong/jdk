@@ -2370,6 +2370,7 @@ void Matcher::find_shared_post_visit(Node* n, uint opcode) {
       n->del_req(3);
       break;
     }
+    case Op_VectorSlice:
     case Op_VectorBlend:
     case Op_VectorInsert: {
       Node* pair = new BinaryNode(n->in(1), n->in(2));
@@ -2708,6 +2709,15 @@ BasicType Matcher::vector_element_basic_type(const MachNode* use, const MachOper
   int def_idx = use->operand_index(opnd);
   Node* def = use->in(def_idx);
   return def->bottom_type()->is_vect()->element_basic_type();
+}
+
+int Matcher::get_input_index(const Node* n, int opcode) {
+  for (uint i = 1; i < n->req(); i++) {
+    if (n->in(i)->Opcode() == opcode) {
+      return i;
+    }
+  }
+  return -1;
 }
 
 bool Matcher::is_non_long_integral_vector(const Node* n) {
